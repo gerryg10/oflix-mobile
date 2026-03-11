@@ -77,11 +77,26 @@ export default function VideoPlayer({
 
     if (url.includes('.m3u8')) {
       if (Hls.isSupported()) {
-        const hls = new Hls({ enableWorker: true, fragLoadingMaxRetry: 10 });
+        const hls = new Hls({
+          enableWorker: true,
+          fragLoadingMaxRetry: 10,
+          // Start at highest quality immediately, no ramp-up
+          startLevel: -1,          // -1 = let startLevelAuto pick, overridden below
+          autoLevelCapping: -1,    // no cap
+          abrEwmaDefaultEstimate: 10_000_000, // assume 10Mbps → picks highest level
+        });
         hls.loadSource(url);
         hls.attachMedia(video);
         hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
-          setHlsLevels(data.levels || []);
+          const levels = data.levels || [];
+          setHlsLevels(levels);
+          // Force highest level (sorted by bitrate ascending, last = highest)
+          const highestIdx = levels.length - 1;
+          if (highestIdx >= 0) {
+            hls.startLevel   = highestIdx;
+            hls.currentLevel = highestIdx;
+            setCurHlsLevel(highestIdx);
+          }
           startPlay();
         });
         hlsRef.current = hls;
