@@ -22,6 +22,10 @@ export default function VideoPlayer({
   const blobUrls    = useRef([]);
   const wrapRef     = useRef(null); // fullscreen target = entire player wrapper
 
+  // ── Web Audio API ──────────────────────────────────────
+  const audioCtxRef = useRef(null); // AudioContext
+  const sourceRef   = useRef(null); // MediaElementSourceNode (created once per <video>)
+
   const [playing, setPlaying]         = useState(false);
   const [duration, setDuration]       = useState(0);
   const [curTime, setCurTime]         = useState(0);
@@ -37,6 +41,13 @@ export default function VideoPlayer({
 
   /* ── cleanup blobs ──────────────────────────────────── */
   useEffect(() => () => blobUrls.current.forEach(u => URL.revokeObjectURL(u)), []);
+
+  // Cleanup AudioContext on unmount
+  useEffect(() => () => {
+    try { audioCtxRef.current?.close(); } catch {}
+    audioCtxRef.current = null;
+    sourceRef.current   = null;
+  }, []);
 
   /* ── track fullscreen state ─────────────────────────── */
   useEffect(() => {
@@ -69,8 +80,57 @@ export default function VideoPlayer({
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
     setHlsLevels([]); setCurHlsLevel(-1); setCurDlIdx(0);
 
+    function initAudio() {
+      if (sourceRef.current) return; // already wired
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        audioCtxRef.current = ctx;
+
+        const source = ctx.createMediaElementSource(video);
+        sourceRef.current = source;
+
+        // ── 1. High-shelf EQ: boost dialogue presence (2–8 kHz) ──
+        const hiMid = ctx.createBiquadFilter();
+        hiMid.type            = 'peaking';
+        hiMid.frequency.value = 3500;   // centre of voice intelligibility
+        hiMid.Q.value         = 0.9;
+        hiMid.gain.value      = 4;      // +4 dB
+
+        // ── 2. Low-cut: remove mud below 100 Hz ──────────────────
+        const lowCut = ctx.createBiquadFilter();
+        lowCut.type            = 'highpass';
+        lowCut.frequency.value = 100;
+        lowCut.Q.value         = 0.7;
+
+        // ── 3. Compressor: level out loud/quiet swings ───────────
+        const comp = ctx.createDynamicsCompressor();
+        comp.threshold.value = -24;   // start compressing at -24 dBFS
+        comp.knee.value      = 8;
+        comp.ratio.value     = 4;     // 4:1 ratio
+        comp.attack.value    = 0.003; // fast attack (3 ms)
+        comp.release.value   = 0.25;  // 250 ms release
+
+        // ── 4. Makeup gain: bring overall loudness up ─────────────
+        const gain = ctx.createGain();
+        gain.gain.value = 1.4;        // +~3 dB perceived loudness
+
+        // Chain: source → lowCut → hiMid → comp → gain → output
+        source.connect(lowCut);
+        lowCut.connect(hiMid);
+        hiMid.connect(comp);
+        comp.connect(gain);
+        gain.connect(ctx.destination);
+
+        // Resume context if suspended (browser autoplay policy)
+        if (ctx.state === 'suspended') ctx.resume();
+      } catch (e) {
+        console.warn('Web Audio init failed:', e.message);
+      }
+    }
+
     function startPlay() {
       video.currentTime = savedTime > 10 ? savedTime : 0;
+      initAudio();
       video.play().catch(() => {});
       setPlaying(true);
     }
@@ -172,6 +232,8 @@ export default function VideoPlayer({
   function togglePlay(e) {
     e?.stopPropagation();
     const v = videoRef.current; if (!v) return;
+    // Resume AudioContext on first user gesture (required by browsers)
+    if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
     v.paused ? v.play() : v.pause();
     showControls();
   }
