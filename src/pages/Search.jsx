@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchSearch, fetchKomikSearch, fetchDonghuaSearch, stripQuery } from '../api.js';
-import MovieCard from '../components/MovieCard.jsx';
 
 export default function SearchPage({ onCardClick }) {
   const [q, setQ]           = useState('');
@@ -64,7 +63,7 @@ export default function SearchPage({ onCardClick }) {
     }
   }
 
-  const srcBadge = { film: '🎬', donghua: '🐉', komik: '📚' };
+  const srcLabel = { film: 'Film', donghua: 'Donghua', komik: 'Komik' };
   const srcColor = { film: '#e50914', donghua: '#e5a000', komik: '#4CAF50' };
 
   return (
@@ -98,18 +97,31 @@ export default function SearchPage({ onCardClick }) {
       )}
 
       {results.length > 0 && (
-        <div className="search-results-grid">
+        <div className="search-list">
           {results.map((item, i) => (
-            <div key={i} style={{ position: 'relative' }}>
-              <MovieCard item={item} onClick={() => handleClick(item)} />
-              <span style={{
-                position: 'absolute', top: 6, right: 6,
-                background: srcColor[item._src] || '#333',
-                color: '#fff', fontSize: 9, fontWeight: 800,
-                padding: '2px 6px', borderRadius: 6,
-              }}>
-                {srcBadge[item._src]}
-              </span>
+            <div key={i} className="search-row" onClick={() => handleClick(item)}>
+              {/* Poster kecil */}
+              <div className="search-row-poster">
+                {item.poster
+                  ? <img src={item.poster} alt="" onError={e => { e.target.style.display='none'; }} />
+                  : <i className="fas fa-film" style={{ color: '#333', fontSize: 20 }} />
+                }
+              </div>
+
+              {/* Info */}
+              <div className="search-row-info">
+                <div className="search-row-title">{item.title || item.name}</div>
+                <div className="search-row-meta">
+                  {item.genre && <span>"{item.genre}"</span>}
+                  {item.rating && <span>"{item.rating}"</span>}
+                  {item.year  && <span>"{item.year}"</span>}
+                </div>
+              </div>
+
+              {/* Type badge — kanan */}
+              <div className="search-row-type" style={{ color: srcColor[item._src] || '#555' }}>
+                {srcLabel[item._src] || item._src}
+              </div>
             </div>
           ))}
         </div>
