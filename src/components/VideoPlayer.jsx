@@ -38,6 +38,7 @@ export default function VideoPlayer({
   const [curHlsLevel, setCurHlsLevel] = useState(-1);
   const [curDlIdx, setCurDlIdx]       = useState(0);
   const [subIdx, setSubIdx]           = useState(0);
+  const [subSize, setSubSize]         = useState('medium'); // small=14 medium=24 large=32
 
   /* ── cleanup blobs ──────────────────────────────────── */
   useEffect(() => () => blobUrls.current.forEach(u => URL.revokeObjectURL(u)), []);
@@ -284,10 +285,29 @@ export default function VideoPlayer({
   }
 
   /* ── subtitle ────────────────────────────────────────── */
+  const SUB_SIZES = { small: 14, medium: 24, large: 32 };
+
+  function applyCueSize(size) {
+    const px = SUB_SIZES[size] || 24;
+    let styleEl = document.getElementById('oflix-cue-size');
+    if (!styleEl) {
+      styleEl = document.createElement('style');
+      styleEl.id = 'oflix-cue-size';
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = `::cue { font-size: ${px}px !important; }`;
+  }
+
+  function changeSubSize(size) {
+    setSubSize(size);
+    applyCueSize(size);
+  }
+
   function selectSub(i) {
     setSubIdx(i); setShowSubMenu(false);
     const video = videoRef.current; if (!video) return;
     Array.from(video.textTracks).forEach((t, idx) => { t.mode = idx === i ? 'showing' : 'disabled'; });
+    applyCueSize(subSize);
   }
   function turnOffSub() {
     setSubIdx(-1); setShowSubMenu(false);
@@ -423,6 +443,19 @@ export default function VideoPlayer({
                     {subtitles.map((s,i) => (
                       <div key={i} className={`pctrl-popup-item ${subIdx===i?'on':''}`} onClick={e=>{e.stopPropagation();selectSub(i);}}>{s.name}</div>
                     ))}
+                    <div className="pctrl-popup-divider" />
+                    <div className="pctrl-popup-head">Ukuran Teks</div>
+                    <div className="pctrl-size-row">
+                      {['small','medium','large'].map(sz => (
+                        <button
+                          key={sz}
+                          className={`pctrl-size-btn ${subSize===sz?'on':''}`}
+                          onClick={e=>{e.stopPropagation();changeSubSize(sz);}}
+                        >
+                          {sz==='small'?'S':sz==='medium'?'M':'L'}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
