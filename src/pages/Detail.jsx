@@ -64,34 +64,23 @@ export default function DetailPage() {
       const res = await fetchStream(parsed.id, seasonVal, episodeVal, detailPath);
       if (!res.success) { setPlayerLoading(false); return; }
 
-      // Build downloads[] sorted low→high
+      // Build downloads[] sorted high→low (highest quality first)
       const downloads = [];
       if (res.downloads?.length) {
-        const sorted = [...res.downloads].sort((a,b) => (a.resolution||0)-(b.resolution||0));
+        const sorted = [...res.downloads].sort((a,b) => (b.resolution||0)-(a.resolution||0));
         sorted.forEach(d => { if (d.url) downloads.push({ label: d.resolution ? d.resolution+'p' : 'Auto', url: d.url, resolution: d.resolution||0 }); });
       }
 
-      // Resolution → typical bandwidth map (bits/s)
-      const BW = { 360:800000, 480:1400000, 720:2800000, 1080:5000000, 1440:8000000, 2160:16000000 };
-      const RES_DIM = { 360:'640x360', 480:'854x480', 720:'1280x720', 1080:'1920x1080', 1440:'2560x1440', 2160:'3840x2160' };
-
-      // Generate client-side master.m3u8 Blob from downloads array
-      let finalUrl = res.url || '';
-      if (downloads.length > 1) {
-        const lines = ['#EXTM3U'];
-        downloads.forEach(d => {
-          const bw  = BW[d.resolution]  || 2000000;
-          const dim = RES_DIM[d.resolution] || '';
-          const inf = dim
-            ? `#EXT-X-STREAM-INF:BANDWIDTH=${bw},RESOLUTION=${dim},NAME="${d.label}"`
-            : `#EXT-X-STREAM-INF:BANDWIDTH=${bw},NAME="${d.label}"`;
-          lines.push(inf, d.url);
-        });
-        const blob = new Blob([lines.join('\n')], { type: 'application/vnd.apple.mpegurl' });
-        finalUrl = URL.createObjectURL(blob);
-      } else if (downloads.length === 1) {
-        // Single quality — use directly (may be mp4 or m3u8)
+      // finalUrl: if source is already m3u8 use that, otherwise use highest MP4
+      // Never wrap MP4s in a fake m3u8 — they're not segmented HLS
+      let finalUrl = '';
+      if (res.url?.includes('.m3u8')) {
+        finalUrl = res.url;
+      } else if (downloads.length > 0) {
+        // Start at highest quality MP4, VideoPlayer handles manual switching via downloads[]
         finalUrl = downloads[0].url;
+      } else {
+        finalUrl = res.url || '';
       }
 
       const subtitles = [];

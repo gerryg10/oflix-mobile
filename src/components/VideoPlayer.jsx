@@ -74,17 +74,11 @@ export default function VideoPlayer({
     };
   }, []);
 
-  // Track previous blob URL for cleanup
-  const prevUrlRef = useRef(null);
-
   /* ── load source ────────────────────────────────────── */
   useEffect(() => {
     if (!url) return;
     const video = videoRef.current;
     if (!video) return;
-    // Revoke previous blob master playlist
-    if (prevUrlRef.current?.startsWith('blob:')) URL.revokeObjectURL(prevUrlRef.current);
-    prevUrlRef.current = url;
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
     setHlsLevels([]); setCurHlsLevel(-1); setCurDlIdx(0);
 
@@ -143,8 +137,7 @@ export default function VideoPlayer({
       setPlaying(true);
     }
 
-    // blob: URLs are generated master.m3u8 playlists, treat same as .m3u8
-    if (url.includes('.m3u8') || url.startsWith('blob:')) {
+    if (url.includes('.m3u8')) {
       if (Hls.isSupported()) {
         const hls = new Hls({
           enableWorker: true,
@@ -186,7 +179,7 @@ export default function VideoPlayer({
     if (!video) return;
     // Reset subtitle state on every change (episode switch etc)
     setSubIdx(0);
-    Array.from(video.querySelectorAll('track')).forEach(t => t.remove());
+    Array.from(video.querySelectorAll('track')).forEach(t => { try { video.removeChild(t); } catch {} });
     blobUrls.current.forEach(u => URL.revokeObjectURL(u));
     blobUrls.current = [];
     if (!subtitles.length) return;
