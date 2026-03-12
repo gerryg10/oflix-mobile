@@ -64,14 +64,35 @@ export default function DetailPage() {
       const res = await fetchStream(parsed.id, seasonVal, episodeVal, detailPath);
       if (!res.success) { setPlayerLoading(false); return; }
 
-      // Pass ALL quality options so VideoPlayer can switch
+      // Build downloads[] sorted low→high
       const downloads = [];
       if (res.downloads?.length) {
         const sorted = [...res.downloads].sort((a,b) => (a.resolution||0)-(b.resolution||0));
-        sorted.forEach(d => { if (d.url) downloads.push({ label: d.resolution ? d.resolution+'p' : 'Auto', url: d.url }); });
+        sorted.forEach(d => { if (d.url) downloads.push({ label: d.resolution ? d.resolution+'p' : 'Auto', url: d.url, resolution: d.resolution||0 }); });
       }
-      // fallback single URL
-      const finalUrl = downloads.length ? downloads[0].url : (res.url || '');
+
+      // Resolution → typical bandwidth map (bits/s)
+      const BW = { 360:800000, 480:1400000, 720:2800000, 1080:5000000, 1440:8000000, 2160:16000000 };
+      const RES_DIM = { 360:'640x360', 480:'854x480', 720:'1280x720', 1080:'1920x1080', 1440:'2560x1440', 2160:'3840x2160' };
+
+      // Generate client-side master.m3u8 Blob from downloads array
+      let finalUrl = res.url || '';
+      if (downloads.length > 1) {
+        const lines = ['#EXTM3U'];
+        downloads.forEach(d => {
+          const bw  = BW[d.resolution]  || 2000000;
+          const dim = RES_DIM[d.resolution] || '';
+          const inf = dim
+            ? `#EXT-X-STREAM-INF:BANDWIDTH=${bw},RESOLUTION=${dim},NAME="${d.label}"`
+            : `#EXT-X-STREAM-INF:BANDWIDTH=${bw},NAME="${d.label}"`;
+          lines.push(inf, d.url);
+        });
+        const blob = new Blob([lines.join('\n')], { type: 'application/vnd.apple.mpegurl' });
+        finalUrl = URL.createObjectURL(blob);
+      } else if (downloads.length === 1) {
+        // Single quality — use directly (may be mp4 or m3u8)
+        finalUrl = downloads[0].url;
+      }
 
       const subtitles = [];
       if (res.captions?.length) {

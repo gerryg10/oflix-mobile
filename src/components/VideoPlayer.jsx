@@ -33,6 +33,7 @@ export default function VideoPlayer({
   const [showEpPanel, setShowEpPanel] = useState(false);
   const [showQuality, setShowQuality] = useState(false);
   const [showSubMenu, setShowSubMenu] = useState(false);
+  const [showSizeMenu, setShowSizeMenu] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hlsLevels, setHlsLevels]     = useState([]);
   const [curHlsLevel, setCurHlsLevel] = useState(-1);
@@ -73,11 +74,17 @@ export default function VideoPlayer({
     };
   }, []);
 
+  // Track previous blob URL for cleanup
+  const prevUrlRef = useRef(null);
+
   /* ── load source ────────────────────────────────────── */
   useEffect(() => {
     if (!url) return;
     const video = videoRef.current;
     if (!video) return;
+    // Revoke previous blob master playlist
+    if (prevUrlRef.current?.startsWith('blob:')) URL.revokeObjectURL(prevUrlRef.current);
+    prevUrlRef.current = url;
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
     setHlsLevels([]); setCurHlsLevel(-1); setCurDlIdx(0);
 
@@ -136,7 +143,8 @@ export default function VideoPlayer({
       setPlaying(true);
     }
 
-    if (url.includes('.m3u8')) {
+    // blob: URLs are generated master.m3u8 playlists, treat same as .m3u8
+    if (url.includes('.m3u8') || url.startsWith('blob:')) {
       if (Hls.isSupported()) {
         const hls = new Hls({
           enableWorker: true,
@@ -434,7 +442,7 @@ export default function VideoPlayer({
               <div className="pctrl-menu-wrap">
                 <button
                   className={`pctrl-btn pctrl-cc ${subIdx >= 0 ? 'active' : ''}`}
-                  onClick={e => { e.stopPropagation(); setShowSubMenu(v=>!v); setShowQuality(false); }}
+                  onClick={e => { e.stopPropagation(); setShowSubMenu(v=>!v); setShowQuality(false); setShowSizeMenu(false); }}
                 >CC</button>
                 {showSubMenu && (
                   <div className="pctrl-popup">
@@ -443,30 +451,44 @@ export default function VideoPlayer({
                     {subtitles.map((s,i) => (
                       <div key={i} className={`pctrl-popup-item ${subIdx===i?'on':''}`} onClick={e=>{e.stopPropagation();selectSub(i);}}>{s.name}</div>
                     ))}
-                    <div className="pctrl-popup-divider" />
-                    <div className="pctrl-popup-head">Ukuran Teks</div>
-                    <div className="pctrl-size-row">
-                      {['small','medium','large'].map(sz => (
-                        <button
-                          key={sz}
-                          className={`pctrl-size-btn ${subSize===sz?'on':''}`}
-                          onClick={e=>{e.stopPropagation();changeSubSize(sz);}}
-                        >
-                          {sz==='small'?'S':sz==='medium'?'M':'L'}
-                        </button>
-                      ))}
-                    </div>
+
                   </div>
                 )}
               </div>
             )}
+
+            {/* Font size button — always visible */}
+            <div className="pctrl-menu-wrap">
+              <button
+                className="pctrl-btn pctrl-quality"
+                onClick={e => { e.stopPropagation(); setShowSubMenu(false); setShowQuality(false); setShowSizeMenu(v=>!v); }}
+                title="Ukuran Subtitle"
+              >
+                <i className="fas fa-text-height" />
+              </button>
+              {showSizeMenu && (
+                <div className="pctrl-popup" style={{minWidth:130}}>
+                  <div className="pctrl-popup-head">Ukuran Subtitle</div>
+                  {[['small','S','14px'],['medium','M','24px'],['large','L','32px']].map(([sz,label,px]) => (
+                    <div
+                      key={sz}
+                      className={`pctrl-popup-item ${subSize===sz?'on':''}`}
+                      onClick={e=>{e.stopPropagation();changeSubSize(sz);setShowSizeMenu(false);}}
+                    >
+                      <span style={{marginRight:8,fontWeight:900}}>{label}</span>
+                      <span style={{opacity:0.5,fontSize:11}}>{px}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Quality */}
             {hasQuality && (
               <div className="pctrl-menu-wrap">
                 <button
                   className="pctrl-btn pctrl-quality"
-                  onClick={e => { e.stopPropagation(); setShowQuality(v=>!v); setShowSubMenu(false); }}
+                  onClick={e => { e.stopPropagation(); setShowQuality(v=>!v); setShowSubMenu(false); setShowSizeMenu(false); }}
                 >{qualityLabel()}</button>
                 {showQuality && (
                   <div className="pctrl-popup">
@@ -489,7 +511,7 @@ export default function VideoPlayer({
 
             {/* Episodes */}
             {seasons.length > 0 && (
-              <button className="pctrl-btn" onClick={e=>{e.stopPropagation();setShowEpPanel(v=>!v);setShowQuality(false);setShowSubMenu(false);}}>
+              <button className="pctrl-btn" onClick={e=>{e.stopPropagation();setShowEpPanel(v=>!v);setShowQuality(false);setShowSubMenu(false);setShowSizeMenu(false);}}>
                 <i className="fas fa-list" />
               </button>
             )}
