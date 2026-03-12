@@ -175,6 +175,8 @@ export default function VideoPlayer({
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+    // Reset subtitle state on every change (episode switch etc)
+    setSubIdx(0);
     Array.from(video.querySelectorAll('track')).forEach(t => t.remove());
     blobUrls.current.forEach(u => URL.revokeObjectURL(u));
     blobUrls.current = [];
@@ -461,8 +463,19 @@ export default function VideoPlayer({
           </div>
         </div>
 
-        {/* CENTER: skip-back | play/pause | skip-forward */}
+        {/* CENTER: [⏮] [-10] [▶] [+10] [⏭] — prev/next only for series */}
         <div className="player-center" onClick={togglePlay}>
+          {/* Prev episode */}
+          {eps.length > 0 && (
+            <button
+              className="player-center-btn ep-nav"
+              disabled={currentEpIdx <= 0}
+              onClick={e=>{e.stopPropagation(); if(currentEpIdx>0) playEp(currentSeasonIdx, currentEpIdx-1);}}
+            >
+              <i className="fas fa-step-backward" />
+            </button>
+          )}
+
           <button className="player-center-btn skip" onClick={e=>{e.stopPropagation();seekBy(-10);}}>
             <i className="fas fa-undo" style={{fontSize:13}} />
             <span style={{fontSize:8,position:'absolute',marginTop:1}}>10</span>
@@ -473,6 +486,17 @@ export default function VideoPlayer({
           <button className="player-center-btn skip" onClick={e=>{e.stopPropagation();seekBy(10);}}>
             <i className="fas fa-redo" style={{fontSize:13}} />
           </button>
+
+          {/* Next episode */}
+          {eps.length > 0 && (
+            <button
+              className="player-center-btn ep-nav"
+              disabled={currentEpIdx >= eps.length - 1}
+              onClick={e=>{e.stopPropagation(); if(currentEpIdx<eps.length-1) playEp(currentSeasonIdx, currentEpIdx+1);}}
+            >
+              <i className="fas fa-step-forward" />
+            </button>
+          )}
         </div>
 
         {/* BOTTOM: progress bar + time row */}
