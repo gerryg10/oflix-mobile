@@ -18,27 +18,41 @@ function Reader({ chapters, startIdx, series, poster, onClose, saveProgress, res
   const [loadedSet,   setLoadedSet]   = useState(new Set());
   const [loadingNext, setLoadingNext] = useState(false);
   const [endReached,  setEndReached]  = useState(false);
-  const [curChIdx,    setCurChIdx]    = useState(startIdx);
   const [curChTitle,  setCurChTitle]  = useState(chapters[startIdx]?.title || '');
 
   const readyRef      = useRef(false);
   const loadingRef    = useRef(false);
   const sentinelRef   = useRef(null);
-  const pageRefs      = useRef({});   // key: `${chIdx}-${pageIdx}` → DOM node
-  const currentPageRef = useRef(0);  // last visible page index in first block
-  const didResume     = useRef(false); // scroll-to-resume done once
+  const pageRefs      = useRef({});        // `${chIdx}-${pageIdx}` → img DOM node
+  const didResume     = useRef(false);
+  const saveTimerRef  = useRef(null);      // throttle save
+  // Keep latest values accessible in callbacks without stale closure
+  const blocksRef     = useRef([]);
+  const loadedSetRef  = useRef(new Set());
 
-  // ── hide BottomNav while reader open ──
+  // ── hide BottomNav & AppHeader while reader open ──
   useEffect(() => {
     const nav = document.querySelector('.bottom-nav');
+    const hdr = document.querySelector('.app-header');
     if (nav) nav.style.display = 'none';
-    const header = document.querySelector('.app-header');
-    if (header) header.style.display = 'none';
+    if (hdr) hdr.style.display = 'none';
     return () => {
       if (nav) nav.style.display = '';
-      if (header) header.style.display = '';
+      if (hdr) hdr.style.display = '';
     };
   }, []);
+
+  // ── Sync refs with state ──
+  useEffect(() => { blocksRef.current = blocks; }, [blocks]);
+  useEffect(() => { loadedSetRef.current = loadedSet; }, [loadedSet]);
+
+  // ── Throttled save — only fires 500ms after last call ──
+  function throttledSave(chIdx, chTitle, pageIdx) {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      saveProgress(chIdx, chTitle, poster, series, pageIdx);
+    }, 500);
+  }
 
   // ── Initial chapter load ──
   useEffect(() => {
@@ -46,6 +60,8 @@ function Reader({ chapters, startIdx, series, poster, onClose, saveProgress, res
     if (!ch) return;
     readyRef.current   = false;
     loadingRef.current = false;
+    didResume.current  = false;
+    pageRefs.current   = {};
     setBlocks([]);
     setLoadedSet(new Set());
     setEndReached(false);
@@ -54,19 +70,22 @@ function Reader({ chapters, startIdx, series, poster, onClose, saveProgress, res
     const slug = ch.bacaManga || ch.url || ch.slug || '';
     fetchPages(slug)
       .then(pages => {
-        setBlocks([{ chIdx: startIdx, title: ch.title, pages }]);
+        const newBlock = { chIdx: startIdx, title: ch.title, pages };
+        setBlocks([newBlock]);
         setLoadedSet(new Set([startIdx]));
-        setCurChIdx(startIdx);
         setCurChTitle(ch.title);
         setLoadingNext(false);
-        saveProgress(startIdx, ch.title, poster, series);
+        // Don't overwrite pageIdx on initial load — only save chapter/title
+        // pageIdx will be saved by the visibility observer as user scrolls
         setTimeout(() => { readyRef.current = true; }, 1500);
       })
       .catch(e => { console.warn(e); setLoadingNext(false); });
   }, [startIdx]);
 
   // ── Load next chapter ──
-  function loadNext(currentBlocks, currentSet) {
+  function loadNext() {
+    const currentBlocks = blocksRef.current;
+    const currentSet    = loadedSetRef.current;
     if (loadingRef.current || endReached) return;
     const last = currentBlocks[currentBlocks.length - 1];
     if (!last) return;
@@ -86,11 +105,11 @@ function Reader({ chapters, startIdx, series, poster, onClose, saveProgress, res
       .then(pages => {
         setBlocks(prev => [...prev, { chIdx: nextIdx, title: ch.title, pages }]);
         setLoadedSet(prev => new Set([...prev, nextIdx]));
-        setCurChIdx(nextIdx);
         setCurChTitle(ch.title);
         setLoadingNext(false);
         loadingRef.current = false;
-        saveProgress(nextIdx, ch.title, poster, series);
+        // Save with pageIdx=0 for the new chapter that just started loading
+        throttledSave(nextIdx, ch.title, 0);
         setTimeout(() => { readyRef.current = true; }, 1500);
       })
       .catch(e => { console.warn(e); setLoadingNext(false); loadingRef.current = false; });
@@ -103,10 +122,7 @@ function Reader({ chapters, startIdx, series, poster, onClose, saveProgress, res
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && readyRef.current && !loadingRef.current) {
-          setBlocks(prev => {
-            setLoadedSet(prevSet => { loadNext(prev, prevSet); return prevSet; });
-            return prev;
-          });
+          loadNext();
         }
       },
       { rootMargin: '300px' }
@@ -115,39 +131,47 @@ function Reader({ chapters, startIdx, series, poster, onClose, saveProgress, res
     return () => observer.disconnect();
   }, [blocks.length, endReached]);
 
-  // ── IntersectionObserver — track current visible page for save ──
+  // ── IntersectionObserver — track visible page across ALL blocks ──
   useEffect(() => {
     if (blocks.length === 0) return;
-    const firstBlock = blocks[0];
-    const nodes = firstBlock.pages.map((_, i) => pageRefs.current[`${firstBlock.chIdx}-${i}`]).filter(Boolean);
-    if (nodes.length === 0) return;
-
+    // Observe all pages in all loaded blocks
     const obs = new IntersectionObserver(entries => {
       entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          const idx = parseInt(entry.target.dataset.pageIdx || '0', 10);
-          currentPageRef.current = idx;
-          // Save every time page changes (throttled naturally by visibility change)
-          saveProgress(firstBlock.chIdx, firstBlock.title, poster, series, idx);
-        }
+        if (!entry.isIntersecting) return;
+        const el = entry.target;
+        const chIdx  = parseInt(el.dataset.chIdx  || '0', 10);
+        const pgIdx  = parseInt(el.dataset.pageIdx || '0', 10);
+        const chTitle = el.dataset.chTitle || '';
+        // Update header title
+        setCurChTitle(chTitle);
+        // Throttled save with correct chIdx + pageIdx
+        throttledSave(chIdx, chTitle, pgIdx);
       });
-    }, { threshold: 0.3 });
+    }, { threshold: 0.4 });
 
-    nodes.forEach(n => obs.observe(n));
+    // Observe every loaded img
+    Object.values(pageRefs.current).forEach(el => { if (el) obs.observe(el); });
     return () => obs.disconnect();
-  }, [blocks.length]);
+  }, [blocks.length]); // re-run when new block appended
 
-  // ── Scroll to resume page after first block renders ──
+  // ── Resume scroll — wait for target image to actually render ──
   useEffect(() => {
     if (didResume.current || resumePageIdx <= 0 || blocks.length === 0) return;
     const firstBlock = blocks[0];
-    const target = pageRefs.current[`${firstBlock.chIdx}-${resumePageIdx}`];
-    if (!target) return;
-    didResume.current = true;
-    // Small delay to ensure layout is done
-    setTimeout(() => {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 400);
+    const key = `${firstBlock.chIdx}-${resumePageIdx}`;
+
+    // Poll until the ref exists (lazy-loaded imgs may not be in DOM yet)
+    let attempts = 0;
+    const poll = setInterval(() => {
+      const target = pageRefs.current[key];
+      if (target) {
+        clearInterval(poll);
+        didResume.current = true;
+        target.scrollIntoView({ behavior: 'instant', block: 'start' });
+      }
+      if (++attempts > 30) clearInterval(poll); // give up after 3s
+    }, 100);
+    return () => clearInterval(poll);
   }, [blocks]);
 
   return (
@@ -162,7 +186,6 @@ function Reader({ chapters, startIdx, series, poster, onClose, saveProgress, res
         borderBottom: '1px solid #1a1a1a',
         display: 'flex', alignItems: 'center', gap: 10,
         padding: '0 14px',
-        maxWidth: '100%',
       }}>
         <button
           onClick={onClose}
@@ -205,19 +228,18 @@ function Reader({ chapters, startIdx, series, poster, onClose, saveProgress, res
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {block.pages.map((pg, i) => {
               const src = typeof pg === 'string' ? pg : (pg.url || pg.src || pg.image || '');
+              const isNearResume = bi === 0 && Math.abs(i - resumePageIdx) <= 5;
               return (
                 <img
-                  key={i} src={src}
+                  key={i}
+                  src={src}
                   alt={`Ch${block.chIdx + 1} p${i + 1}`}
-                  loading={bi === 0 && i < resumePageIdx + 3 ? 'eager' : 'lazy'}
+                  loading={isNearResume ? 'eager' : 'lazy'}
+                  data-ch-idx={block.chIdx}
                   data-page-idx={i}
+                  data-ch-title={block.title}
                   ref={el => { if (el) pageRefs.current[`${block.chIdx}-${i}`] = el; }}
-                  style={{
-                    width: '100%',
-                    maxWidth: '100%',
-                    display: 'block',
-                    objectFit: 'contain',
-                  }}
+                  style={{ width: '100%', maxWidth: '100%', display: 'block', objectFit: 'contain' }}
                   onError={e => { e.target.style.opacity = '0.08'; }}
                 />
               );
@@ -247,11 +269,11 @@ function Reader({ chapters, startIdx, series, poster, onClose, saveProgress, res
           }}>← Kembali ke Detail</button>
         </div>
       )}
-
       <div style={{ height: 20 }} />
     </div>
   );
 }
+
 
 /* ─── KOMIK DETAIL page ──────────────────────────────────── */
 export default function KomikDetail() {
@@ -267,6 +289,7 @@ export default function KomikDetail() {
   const [poster,    setPoster]    = useState('');
   const [descOpen,  setDescOpen]  = useState(false);
   const [readerIdx, setReaderIdx] = useState(null); // null = detail view
+  const [progVersion, setProgVersion] = useState(0); // bump to re-read progress
 
   useEffect(() => {
     if (!slug) return;
@@ -293,6 +316,7 @@ export default function KomikDetail() {
 
   function closeReader() {
     setReaderIdx(null);
+    setProgVersion(v => v + 1); // force re-read localStorage progress
     window.scrollTo(0, 0);
   }
 
@@ -332,7 +356,8 @@ export default function KomikDetail() {
   const title     = meta['Judul Komik'] || meta['Judul'] || info.title || slug;
   const pengarang = meta['Pengarang'] || meta['Author'] || '';
   const status    = meta['Status'] || '';
-  const prog      = getKomikProgress(slug);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const prog      = getKomikProgress(slug); // re-reads after progVersion bumps
 
   return (
     <div className="detail-page">
