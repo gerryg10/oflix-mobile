@@ -76,10 +76,10 @@ export function AuthProvider({ children }) {
   }
 
   // ── Komik read progress (localStorage only) ─────────────
-  function saveKomikProgress(slug, chapterIdx, chapterTitle, poster, seriesTitle) {
+  function saveKomikProgress(slug, chapterIdx, chapterTitle, poster, seriesTitle, pageIdx = 0) {
     const key = `oflix_komik_${slug}`;
     localStorage.setItem(key, JSON.stringify({
-      slug, chapterIdx, chapterTitle, poster, seriesTitle,
+      slug, chapterIdx, chapterTitle, poster, seriesTitle, pageIdx,
       type: 'komik', savedAt: Date.now(),
     }));
   }

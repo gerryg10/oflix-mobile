@@ -13,7 +13,7 @@ async function fetchPages(bacaSlug) {
 }
 
 /* ─── READER (inline, no route change) ──────────────────── */
-function Reader({ chapters, startIdx, series, poster, onClose, saveProgress }) {
+function Reader({ chapters, startIdx, series, poster, onClose, saveProgress, resumePageIdx = 0 }) {
   const [blocks,      setBlocks]      = useState([]);
   const [loadedSet,   setLoadedSet]   = useState(new Set());
   const [loadingNext, setLoadingNext] = useState(false);
@@ -21,9 +21,12 @@ function Reader({ chapters, startIdx, series, poster, onClose, saveProgress }) {
   const [curChIdx,    setCurChIdx]    = useState(startIdx);
   const [curChTitle,  setCurChTitle]  = useState(chapters[startIdx]?.title || '');
 
-  const readyRef    = useRef(false);
-  const loadingRef  = useRef(false);
-  const sentinelRef = useRef(null);
+  const readyRef      = useRef(false);
+  const loadingRef    = useRef(false);
+  const sentinelRef   = useRef(null);
+  const pageRefs      = useRef({});   // key: `${chIdx}-${pageIdx}` → DOM node
+  const currentPageRef = useRef(0);  // last visible page index in first block
+  const didResume     = useRef(false); // scroll-to-resume done once
 
   // ── hide BottomNav while reader open ──
   useEffect(() => {
@@ -93,7 +96,7 @@ function Reader({ chapters, startIdx, series, poster, onClose, saveProgress }) {
       .catch(e => { console.warn(e); setLoadingNext(false); loadingRef.current = false; });
   }
 
-  // ── IntersectionObserver ──
+  // ── IntersectionObserver — sentinel for next chapter ──
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
@@ -111,6 +114,41 @@ function Reader({ chapters, startIdx, series, poster, onClose, saveProgress }) {
     observer.observe(sentinel);
     return () => observer.disconnect();
   }, [blocks.length, endReached]);
+
+  // ── IntersectionObserver — track current visible page for save ──
+  useEffect(() => {
+    if (blocks.length === 0) return;
+    const firstBlock = blocks[0];
+    const nodes = firstBlock.pages.map((_, i) => pageRefs.current[`${firstBlock.chIdx}-${i}`]).filter(Boolean);
+    if (nodes.length === 0) return;
+
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const idx = parseInt(entry.target.dataset.pageIdx || '0', 10);
+          currentPageRef.current = idx;
+          // Save every time page changes (throttled naturally by visibility change)
+          saveProgress(firstBlock.chIdx, firstBlock.title, poster, series, idx);
+        }
+      });
+    }, { threshold: 0.3 });
+
+    nodes.forEach(n => obs.observe(n));
+    return () => obs.disconnect();
+  }, [blocks.length]);
+
+  // ── Scroll to resume page after first block renders ──
+  useEffect(() => {
+    if (didResume.current || resumePageIdx <= 0 || blocks.length === 0) return;
+    const firstBlock = blocks[0];
+    const target = pageRefs.current[`${firstBlock.chIdx}-${resumePageIdx}`];
+    if (!target) return;
+    didResume.current = true;
+    // Small delay to ensure layout is done
+    setTimeout(() => {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 400);
+  }, [blocks]);
 
   return (
     <div style={{ background: '#0a0a0a', minHeight: '100vh', paddingTop: 56 }}>
@@ -171,7 +209,9 @@ function Reader({ chapters, startIdx, series, poster, onClose, saveProgress }) {
                 <img
                   key={i} src={src}
                   alt={`Ch${block.chIdx + 1} p${i + 1}`}
-                  loading="lazy"
+                  loading={bi === 0 && i < resumePageIdx + 3 ? 'eager' : 'lazy'}
+                  data-page-idx={i}
+                  ref={el => { if (el) pageRefs.current[`${block.chIdx}-${i}`] = el; }}
                   style={{
                     width: '100%',
                     maxWidth: '100%',
@@ -256,12 +296,14 @@ export default function KomikDetail() {
     window.scrollTo(0, 0);
   }
 
-  function saveProgress(chIdx, chTitle, posterUrl, seriesTitle) {
-    saveKomikProgress(slug, chIdx, chTitle, posterUrl, seriesTitle);
+  function saveProgress(chIdx, chTitle, posterUrl, seriesTitle, pageIdx = 0) {
+    saveKomikProgress(slug, chIdx, chTitle, posterUrl, seriesTitle, pageIdx);
   }
 
   // ── READER VIEW ──
   if (readerIdx !== null && chapters.length > 0) {
+    const prog = getKomikProgress(slug);
+    const resumePage = (prog && prog.chapterIdx === readerIdx) ? (prog.pageIdx || 0) : 0;
     return (
       <Reader
         chapters={chapters}
@@ -270,6 +312,7 @@ export default function KomikDetail() {
         poster={poster}
         onClose={closeReader}
         saveProgress={saveProgress}
+        resumePageIdx={resumePage}
       />
     );
   }
