@@ -37,9 +37,9 @@ function AppInner() {
       {ready && (
         <>
           <AppHeader />
-          <CategoryTabs />
           {/* main wrapper — no padding on full-screen routes */}
           <div className={isFull ? 'full-page' : 'home-main'}>
+          <CategoryTabs />
             <Routes>
               <Route path="/"             element={<Home        onCardClick={handleCardClick} />} />
               <Route path="/film"         element={<FilmPage    onCardClick={handleCardClick} />} />
