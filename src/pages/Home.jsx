@@ -48,7 +48,7 @@ function HeroBanner({ items, onCardClick }) {
     setIdx(i);
     autoRef.current = setInterval(() => {
       setIdx(v => (v + 1) % items.length);
-    }, 6000);
+    }, 95000);
   }
   function prev(e) { e.stopPropagation(); goTo((idx - 1 + (items?.length||1)) % (items?.length||1)); }
   function next(e) { e.stopPropagation(); goTo((idx + 1) % (items?.length||1)); }
