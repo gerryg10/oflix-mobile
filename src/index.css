@@ -667,8 +667,8 @@ button { cursor: pointer; font-family: var(--font-body); }
 .header-top {
   display: flex; align-items: center;
   padding: 9px 14px;
-  height: 56px;
-  background:#111;
+  height: 42px;
+  background:#000;
 }
 .header-logo { height: 54px; width: 72px; object-fit: contain; }
 .header-user-btn { display: none; }
