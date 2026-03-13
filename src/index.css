@@ -668,8 +668,9 @@ button { cursor: pointer; font-family: var(--font-body); }
   display: flex; align-items: center;
   padding: 9px 14px;
   height: 56px;
+  background:#111;
 }
-.header-logo { height: 72px; width: 54px; background: #111; object-fit: contain; }
+.header-logo { height: 54px; width: 72px; object-fit: contain; }
 .header-user-btn { display: none; }
 .category-tabs {
   display: flex; gap: 8px; overflow-x: auto;
