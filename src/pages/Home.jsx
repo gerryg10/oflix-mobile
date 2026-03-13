@@ -38,7 +38,7 @@ function HeroBanner({ items, onCardClick }) {
     if (!items?.length) return;
     autoRef.current = setInterval(() => {
       setIdx(v => (v + 1) % items.length);
-    }, 6000);
+    }, 96000);
     return () => clearInterval(autoRef.current);
   }, [items?.length]);
 
@@ -48,7 +48,7 @@ function HeroBanner({ items, onCardClick }) {
     setIdx(i);
     autoRef.current = setInterval(() => {
       setIdx(v => (v + 1) % items.length);
-    }, 95000);
+    }, 5000);
   }
   function prev(e) { e.stopPropagation(); goTo((idx - 1 + (items?.length||1)) % (items?.length||1)); }
   function next(e) { e.stopPropagation(); goTo((idx + 1) % (items?.length||1)); }
