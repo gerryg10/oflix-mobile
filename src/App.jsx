@@ -13,10 +13,9 @@ import KomikPage   from './pages/Komik.jsx';
 import KomikDetail from './pages/KomikDetail.jsx';
 import SearchPage  from './pages/Search.jsx';
 import DetailPage  from './pages/Detail.jsx';
-import BacaPage    from './pages/Baca.jsx';
 
-const FULL_ROUTES   = ['/detail', '/baca'];   // no header, no bottom nav, no padding
-const NO_NAV_ROUTES = ['/detail', '/baca'];
+const FULL_ROUTES   = ['/detail'];   // no header, no bottom nav, no padding
+const NO_NAV_ROUTES = ['/detail'];
 
 function AppInner() {
   const nav = useNavigate();
@@ -48,7 +47,6 @@ function AppInner() {
               <Route path="/komik/detail" element={<KomikDetail />} />
               <Route path="/search"       element={<SearchPage  onCardClick={handleCardClick} />} />
               <Route path="/detail"       element={<DetailPage />} />
-              <Route path="/baca"          element={<BacaPage />} />
             </Routes>
           </div>
           {!hideNav && <BottomNav onAccountClick={() => setShowAuth(true)} />}
