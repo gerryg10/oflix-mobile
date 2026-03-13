@@ -5,113 +5,6 @@ import { useAuth } from '../context/AuthContext.jsx';
 
 const KOMIK_API = '/komik_api.php';
 
-/* ─── READER view (inline, replaces /baca) ──────────────── */
-function Reader({ chapter, chapters, currentIdx, series, onClose, onChangeChapter }) {
-  const [pages, setPages]     = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState('');
-
-  useEffect(() => {
-    if (!chapter?.bacaManga) return;
-    setLoading(true);
-    setPages([]);
-    setError('');
-    fetch(`${KOMIK_API}?action=baca&bacaManga=${encodeURIComponent(chapter.bacaManga)}`)
-      .then(r => r.json())
-      .then(res => {
-        if (res.status === 'ok' && res.images?.length) setPages(res.images);
-        else setError('Gagal memuat: ' + (res.message || ''));
-        setLoading(false);
-      })
-      .catch(e => { setError(e.message); setLoading(false); });
-  }, [chapter?.bacaManga]);
-
-  const hasPrev = currentIdx > 0;
-  const hasNext = currentIdx < chapters.length - 1;
-
-  return (
-    <div style={{ background: '#0a0a0a', minHeight: '100vh', paddingBottom: 80 }}>
-      {/* Sticky header */}
-      <div style={{
-        position: 'sticky', top: 0, zIndex: 100,
-        background: 'rgba(0,0,0,0.95)', backdropFilter: 'blur(10px)',
-        borderBottom: '1px solid #1e1e1e',
-        padding: '10px 14px',
-        display: 'flex', alignItems: 'center', gap: 10,
-      }}>
-        <button
-          onClick={onClose}
-          style={{ background:'none', border:'none', color:'#fff', fontSize:18, cursor:'pointer', padding:'4px 8px' }}>
-          <i className="fas fa-chevron-left" />
-        </button>
-        <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:11, color:'#555', fontWeight:700, textTransform:'uppercase', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{series}</div>
-          <div style={{ fontSize:13, color:'#fff', fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{chapter.title}</div>
-        </div>
-      </div>
-
-      {loading && (
-        <div style={{ display:'flex', justifyContent:'center', alignItems:'center', minHeight:'50vh' }}>
-          <div className="spinner" />
-        </div>
-      )}
-
-      {error && !loading && (
-        <div style={{ margin:20, padding:16, background:'#1a0a0a', border:'1px solid #440000', borderRadius:10 }}>
-          <div style={{ color:'#ff6b6b', fontWeight:700, marginBottom:6 }}>⚠️ Gagal memuat</div>
-          <div style={{ color:'#555', fontSize:11, fontFamily:'monospace', wordBreak:'break-all' }}>{error}</div>
-        </div>
-      )}
-
-      {!loading && pages.length > 0 && (
-        <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
-          {pages.map((pg, i) => {
-            const src = typeof pg === 'string' ? pg : (pg.url || pg.src || pg.image || '');
-            return (
-              <img key={i} src={(src)} alt={`Halaman ${i+1}`} loading="lazy"
-                style={{ width:'100%', display:'block' }}
-                onError={e => { e.target.style.opacity = 0.1; }} />
-            );
-          })}
-        </div>
-      )}
-
-      {/* Prev / Next chapter bar */}
-      {!loading && (
-        <div style={{
-          position:'fixed', bottom:0, left:'50%', transform:'translateX(-50%)',
-          width:'100%', maxWidth:430,
-          background:'rgba(0,0,0,0.95)', borderTop:'1px solid #1e1e1e',
-          display:'flex', padding:'10px 14px', gap:10,
-        }}>
-          <button
-            onClick={() => hasPrev && onChangeChapter(currentIdx - 1)}
-            disabled={!hasPrev}
-            style={{
-              flex:1, padding:'12px 0', borderRadius:10, border:'1px solid #222',
-              background: hasPrev ? '#1a1a1a' : '#111',
-              color: hasPrev ? '#fff' : '#333', fontWeight:700, fontSize:13,
-              cursor: hasPrev ? 'pointer' : 'default',
-            }}>
-            ← Sebelumnya
-          </button>
-          <button
-            onClick={() => hasNext && onChangeChapter(currentIdx + 1)}
-            disabled={!hasNext}
-            style={{
-              flex:1, padding:'12px 0', borderRadius:10, border:'none',
-              background: hasNext ? 'var(--primary)' : '#222',
-              color:'#fff', fontWeight:700, fontSize:13,
-              cursor: hasNext ? 'pointer' : 'default',
-            }}>
-            Selanjutnya →
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 /* ─── KOMIK DETAIL page ──────────────────────────────────── */
 export default function KomikDetail() {
   const [params] = useSearchParams();
@@ -126,8 +19,6 @@ export default function KomikDetail() {
   const [poster, setPoster]   = useState('');
   const [descOpen, setDescOpen] = useState(false);
 
-  // Reader state — null = showing detail, object = showing reader
-  const [reader, setReader]   = useState(null); // { chapter, idx }
 
   useEffect(() => {
     if (!slug) return;
@@ -148,36 +39,14 @@ export default function KomikDetail() {
 
   function openChapter(idx) {
     if (!chapters[idx]) return;
-    // Save chapters list for infinite scroll in Baca
-    sessionStorage.setItem('komik_chapters', JSON.stringify(chapters.map(c => ({ title: c.title, url: c.bacaManga || c.url || c.slug }))));
+    const ch = chapters[idx];
+    // Save chapters list for infinite scroll
+    sessionStorage.setItem('komik_chapters', JSON.stringify(
+      chapters.map(c => ({ title: c.title, url: c.bacaManga || c.url || c.slug || '' }))
+    ));
     sessionStorage.setItem('komik_series', series);
-    setReader({ chapter: chapters[idx], idx });
-    document.getElementById('root')?.scrollTo(0, 0);
-  }
-
-  function closeReader() {
-    setReader(null);
-    document.getElementById('root')?.scrollTo(0, 0);
-  }
-
-  function changeChapter(idx) {
-    if (!chapters[idx]) return;
-    setReader({ chapter: chapters[idx], idx });
-    document.getElementById('root')?.scrollTo(0, 0);
-  }
-
-  // ── READER VIEW ───────────────────────────────────────────
-  if (reader) {
-    return (
-      <Reader
-        chapter={reader.chapter}
-        chapters={chapters}
-        currentIdx={reader.idx}
-        series={series}
-        onClose={closeReader}
-        onChangeChapter={changeChapter}
-      />
-    );
+    const bacaSlug = ch.bacaManga || ch.url || ch.slug || '';
+    nav(`/baca?m=${encodeURIComponent(bacaSlug)}&title=${encodeURIComponent(ch.title)}&idx=${idx}&series=${encodeURIComponent(series)}&poster=${encodeURIComponent(poster)}`);
   }
 
   // ── DETAIL VIEW ───────────────────────────────────────────
