@@ -1,26 +1,18 @@
 import { useEffect, useState, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { fetchCategory, fetchDetail } from '../api.js';
+import { useNavigate } from 'react-router-dom';
+import { fetchCategory, fetchDetail, fetchKomikPopuler } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import HorizontalSection from '../components/HorizontalSection.jsx';
 
-const CATS = [
-  { label: 'Home', path: '/'        },
-  { label: 'Movie',    path: '/film'    },
-  { label: 'Series',  path: '/series'  },
-  { label: 'Anichin', path: '/donghua' },
-  { label: 'Komik',   path: '/komik'   },
-];
-
 const SECTIONS = [
-  { action: 'trending',          title: 'Populer',        seeMore: '/film'   },
-  { action: 'indonesian-movies', title: 'Film Indonesia',  seeMore: '/film?cat=indonesian-movies' },
-  { action: 'indonesian-drama',  title: 'Series Indonesia',  seeMore: '/series?cat=indonesian-drama' },
-  { action: 'kdrama',            title: 'K-Drama',         seeMore: '/series?cat=kdrama' },
-  { action: 'anime',             title: 'Anime',            seeMore: '/series?cat=anime' },
-  { action: 'western-tv',        title: 'Series Barat',    seeMore: '/series?cat=western-tv' },
-  { action: 'short-tv',          title: 'Dracin',         seeMore: '/series?cat=short-tv' },
-  { action: 'komik',             title: 'Baca Komik',         seeMore: '/komik' },
+  { action: 'trending',          title: '🔥 Populer',          seeMore: '/film'   },
+  { action: 'indonesian-movies', title: 'Film Indonesia',       seeMore: '/film?cat=indonesian-movies' },
+  { action: 'indonesian-drama',  title: 'Series Indonesia',     seeMore: '/series?cat=indonesian-drama' },
+  { action: 'kdrama',            title: 'K-Drama',              seeMore: '/series?cat=kdrama' },
+  { action: 'anime',             title: 'Anime',                seeMore: '/series?cat=anime' },
+  { action: 'western-tv',        title: 'Series Barat',         seeMore: '/series?cat=western-tv' },
+  { action: 'short-tv',          title: 'Anichin',              seeMore: '/series?cat=short-tv' },
+  { action: 'komik-populer',      title: '📚 Komik Populer',     seeMore: '/komik', isKomik: true },
 ];
 
 function HeroBanner({ items, onCardClick }) {
@@ -49,7 +41,7 @@ function HeroBanner({ items, onCardClick }) {
     setIdx(i);
     autoRef.current = setInterval(() => {
       setIdx(v => (v + 1) % items.length);
-    }, 5000);
+    }, 96000);
   }
   function prev(e) { e.stopPropagation(); goTo((idx - 1 + (items?.length||1)) % (items?.length||1)); }
   function next(e) { e.stopPropagation(); goTo((idx + 1) % (items?.length||1)); }
@@ -91,26 +83,31 @@ function HeroBanner({ items, onCardClick }) {
         <i className="fas fa-chevron-right" />
       </button>
 
-      {/* Dot indicators */}
+      {/* Dot indicators — show 3 dots, sliding window */}
       <div className="hero-dots">
-        {items.map((_, i) => (
-          <button key={i} className={`hero-dot ${i === idx ? 'active' : ''}`}
-            onClick={e => { e.stopPropagation(); goTo(i); }} />
-        ))}
+        {[0, 1, 2].map(offset => {
+          const total = items.length;
+          const dotIdx = (idx + offset - 1 + total) % total;
+          const isActive = offset === 1;
+          return (
+            <button key={offset} className={`hero-dot ${isActive ? 'active' : ''}`}
+              onClick={e => { e.stopPropagation(); goTo(dotIdx); }} />
+          );
+        })}
       </div>
+
+      {/* Mute button — top right corner, independent */}
+      {showVideo && (
+        <button className="hero-mute-btn" onClick={e => { e.stopPropagation(); setMuted(v=>!v); }}>
+          <i className={`fas ${muted ? 'fa-volume-mute' : 'fa-volume-up'}`}></i>
+        </button>
+      )}
 
       <div className="hero-content">
         <div className="hero-title">{hero.title}</div>
-        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-          <button className="hero-play-btn" onClick={e => { e.stopPropagation(); onCardClick(hero); }}>
-            <i className="fas fa-play"></i> Tonton
-          </button>
-          {showVideo && (
-            <button className="hero-mute-btn" onClick={e => { e.stopPropagation(); setMuted(v=>!v); }}>
-              <i className={`fas ${muted ? 'fa-volume-mute' : 'fa-volume-up'}`}></i>
-            </button>
-          )}
-        </div>
+        <button className="hero-play-btn" onClick={e => { e.stopPropagation(); onCardClick(hero); }}>
+          <i className="fas fa-play"></i> Tonton
+        </button>
       </div>
     </div>
   );
@@ -123,7 +120,6 @@ export default function Home({ onCardClick }) {
   const [apiError, setApiError]       = useState('');
   const [loadingFirst, setLoadingFirst] = useState(true);
   const nav = useNavigate();
-  const loc = useLocation();
   const { getAllCW, getWatchlist, getAllKomikProgress } = useAuth();
   const loadedRef = useRef(false);
 
@@ -146,9 +142,18 @@ export default function Home({ onCardClick }) {
 
     SECTIONS.slice(1).forEach(async sec => {
       try {
-        const res = await fetchCategory(sec.action, 1);
-        if (res.success && res.items?.length)
-          setSections(prev => ({ ...prev, [sec.action]: res.items }));
+        if (sec.isKomik) {
+          const res = await fetchKomikPopuler(1);
+          if (res.status === 'ok' && res.items?.length)
+            setSections(prev => ({ ...prev, [sec.action]: res.items.map(k => ({
+              title: k.title, poster: k.poster || k.thumbnail,
+              detailPath: k.slug, type: 'komik', slug: k.slug,
+            })) }));
+        } else {
+          const res = await fetchCategory(sec.action, 1);
+          if (res.success && res.items?.length)
+            setSections(prev => ({ ...prev, [sec.action]: res.items }));
+        }
       } catch {}
     });
   }, []);
@@ -164,28 +169,14 @@ export default function Home({ onCardClick }) {
       {loadingFirst && (
         <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh', flexDirection:'column', gap:16 }}>
           <div className="spinner" />
-          <span style={{ color:'#555', fontSize:12 }}>Memuat...</span>
+          <span style={{ color:'#555', fontSize:12 }}>Memuat konten...</span>
         </div>
       )}
 
       {apiError && !loadingFirst && (
         <div style={{ margin:14, padding:14, background:'#1a0a0a', border:'1px solid #440000', borderRadius:10 }}>
-          <div style={{ color:'#ff6b6b', fontSize:12, fontWeight:700, marginBottom:6 }}>⚠️ Backend Gagal Di Load</div>
+          <div style={{ color:'#ff6b6b', fontSize:12, fontWeight:700, marginBottom:6 }}>⚠️ Gagal load API</div>
           <div style={{ color:'#666', fontSize:10, fontFamily:'monospace', wordBreak:'break-all' }}>{apiError}</div>
-        </div>
-      )}
-
-      {/* Category tabs — in normal flow, scrolls with page */}
-      {!loadingFirst && (
-        <div className="category-tabs">
-          {CATS.map(cat => (
-            <a key={cat.path}
-              className={`cat-tab ${(loc.pathname === cat.path || (cat.path !== '/' && loc.pathname.startsWith(cat.path))) ? 'active' : ''}`}
-              onClick={e => { e.preventDefault(); nav(cat.path); }}
-              href={cat.path}>
-              {cat.label}
-            </a>
-          ))}
         </div>
       )}
 
@@ -245,7 +236,10 @@ export default function Home({ onCardClick }) {
       {SECTIONS.map(sec => {
         const items = sections[sec.action];
         if (!items?.length) return null;
-        return <HorizontalSection key={sec.action} title={sec.title} items={items} seeMorePath={sec.seeMore} onCardClick={onCardClick} />;
+        const handleClick = sec.isKomik
+          ? (item) => nav(`/komik/detail?d=${encodeURIComponent(item.slug || item.detailPath)}`)
+          : onCardClick;
+        return <HorizontalSection key={sec.action} title={sec.title} items={items} seeMorePath={sec.seeMore} onCardClick={handleClick} />;
       })}
     </div>
   );

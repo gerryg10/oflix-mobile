@@ -3,7 +3,8 @@ import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-ro
 import { AuthProvider } from './context/AuthContext.jsx';
 import Preloader   from './components/Preloader.jsx';
 import BottomNav   from './components/BottomNav.jsx';
-import AppHeader   from './components/AppHeader.jsx';
+import AppHeader      from './components/AppHeader.jsx';
+import CategoryTabs   from './components/CategoryTabs.jsx';
 import AuthModal   from './components/AuthModal.jsx';
 import Home        from './pages/Home.jsx';
 import FilmPage    from './pages/Film.jsx';
@@ -36,6 +37,7 @@ function AppInner() {
       {ready && (
         <>
           <AppHeader />
+          <CategoryTabs />
           {/* main wrapper — no padding on full-screen routes */}
           <div className={isFull ? 'full-page' : 'home-main'}>
             <Routes>

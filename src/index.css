@@ -21,7 +21,7 @@
   --muted: #888;
   --border: #222;
   --nav-h: 64px;
-  --header-h: 56px; /* logo only, no tabs */
+  --header-h: 56px; /* only logo is fixed */
   --font-display: 'NetflixSans', 'Bebas Neue', sans-serif;
   --font-body: 'DM Sans', sans-serif;
   --mobile-w: 430px;
@@ -656,6 +656,7 @@ button { cursor: pointer; font-family: var(--font-body); }
   z-index: 4000;
   transition: background 0.3s ease, transform 0.28s ease;
   will-change: transform;
+  background: transparent;
 }
 .app-header.header-hidden { transform: translateY(-110%); }
 .app-header.scrolled {
@@ -667,15 +668,16 @@ button { cursor: pointer; font-family: var(--font-body); }
 .header-top {
   display: flex; align-items: center;
   padding: 9px 14px;
-  height: 42px;
-  background:#000;
+  height: 56px;
+  background: #000;
 }
 .header-logo { height: 54px; width: 72px; object-fit: contain; }
 .header-user-btn { display: none; }
 .category-tabs {
   display: flex; gap: 8px; overflow-x: auto;
   padding: 8px 14px 10px; scrollbar-width: none;
-  /* no position:fixed — scrolls with page */
+  background: var(--bg);
+  /* tabs live in normal flow — scroll with content */
 }
 .category-tabs::-webkit-scrollbar { display: none; }
 .cat-tab {
@@ -692,6 +694,7 @@ button { cursor: pointer; font-family: var(--font-body); }
 
 /* ─── HOME MAIN AREA ─────────────────────────────────────── */
 .home-main { padding-top: var(--header-h); padding-bottom: calc(var(--nav-h) + 10px); }
+/* tabs in flow, so hero starts right after tabs */
 
 .full-page { padding: 0; margin: 0; }
 
@@ -710,7 +713,9 @@ button { cursor: pointer; font-family: var(--font-body); }
 }
 .hero-content {
   position: absolute; bottom: 14px; left: 14px; right: 14px;
+  pointer-events: none; /* children re-enable */
 }
+.hero-content > * { pointer-events: auto; }
 .hero-title {
   font-size: 20px; font-weight: 900; color: #fff;
   text-shadow: 0 2px 10px rgba(0,0,0,0.8); margin-bottom: 8px;
@@ -724,7 +729,8 @@ button { cursor: pointer; font-family: var(--font-body); }
 }
 
 /* ─── PAGE LISTING (Film / Series) ──────────────────────── */
-.listing-page { padding-top: calc(var(--header-h) - 10px); padding-bottom: calc(var(--nav-h) + 10px); }
+.listing-page { padding-top: calc(var(--header-h) + 44px); padding-bottom: calc(var(--nav-h) + 10px); }
+/* +44px for category-tabs height in flow */
 .listing-grid {
   display: grid; grid-template-columns: repeat(3, 1fr);
   gap: 10px; padding: 14px;
@@ -909,8 +915,9 @@ button { cursor: pointer; font-family: var(--font-body); }
 .hero-next { right: 10px; }
 
 .hero-dots {
-  position: absolute; bottom: 52px; left: 50%; transform: translateX(-50%);
+  position: absolute; bottom: 54px; left: 50%; transform: translateX(-50%);
   display: flex; gap: 6px; z-index: 10;
+  pointer-events: auto;
 }
 .hero-dot {
   width: 20px; height: 4px; border-radius: 2px;
@@ -922,9 +929,10 @@ button { cursor: pointer; font-family: var(--font-body); }
   background: var(--primary);
 }
 .hero-mute-btn {
+  position: absolute; top: 12px; right: 12px; z-index: 12;
   width: 36px; height: 36px; border-radius: 50%;
-  background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2);
   color: #fff; font-size: 14px;
   display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
+  cursor: pointer; flex-shrink: 0;
 }

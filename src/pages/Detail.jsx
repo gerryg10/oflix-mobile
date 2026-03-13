@@ -231,7 +231,7 @@ export default function DetailPage() {
           <section style={{ marginBottom:24 }}>
             <div style={{ fontSize:13, fontWeight:800, color:'#fff', marginBottom:12 }}>Pemeran</div>
             <div className="cast-scroll">
-              {toArr(data.cast).map((c,i)=>(
+              {Array.from(new Map(toArr(data.cast).map(c=>[c.name?.trim().toLowerCase(),c])).values()).map((c,i)=>(
                 <div key={i} className="cast-item">
                   <img className="cast-avatar" src={(c.avatar || '')} alt={c.name}
                     onError={e => { e.target.onerror=null; e.target.src=FALLBACK_CAST_SVG; }} />

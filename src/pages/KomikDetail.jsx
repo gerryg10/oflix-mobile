@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchKomikDetail } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -288,7 +288,10 @@ export default function KomikDetail() {
   const [series,    setSeries]    = useState('');
   const [poster,    setPoster]    = useState('');
   const [descOpen,  setDescOpen]  = useState(false);
-  const [readerIdx, setReaderIdx] = useState(null); // null = detail view
+  const [readerIdx, setReaderIdx] = useState(null);
+  const [inList,    setInList]    = useState(() => localStorage.getItem(`oflix_komik_wl_${slug||'x'}`) === '1');
+  const [liked,     setLiked]     = useState(() => localStorage.getItem(`oflix_komik_like_${slug||'x'}`) === '1');
+  const [disliked,  setDisliked]  = useState(() => localStorage.getItem(`oflix_komik_dislike_${slug||'x'}`) === '1'); // null = detail view
   const [progVersion, setProgVersion] = useState(0); // bump to re-read progress
 
   useEffect(() => {
@@ -308,6 +311,10 @@ export default function KomikDetail() {
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [slug]);
+
+  function toggleList()    { const v=!inList;    setInList(v);    localStorage.setItem(`oflix_komik_wl_${slug}`,v?'1':'0'); }
+  function toggleLike()    { const v=!liked;    setLiked(v);    if(v) setDisliked(false); localStorage.setItem(`oflix_komik_like_${slug}`,v?'1':'0'); localStorage.setItem(`oflix_komik_dislike_${slug}`,'0'); }
+  function toggleDislike() { const v=!disliked; setDisliked(v); if(v) setLiked(false);    localStorage.setItem(`oflix_komik_dislike_${slug}`,v?'1':'0'); localStorage.setItem(`oflix_komik_like_${slug}`,'0'); }
 
   function openChapter(idx) {
     setReaderIdx(idx);
@@ -375,6 +382,22 @@ export default function KomikDetail() {
           {pengarang && <span className="meta-badge">✏️ {pengarang}</span>}
           {status    && <span className="meta-badge" style={{ background: 'rgba(229,9,20,0.15)', color: 'var(--primary)' }}>{status}</span>}
           <span className="meta-badge">{chapters.length} Chapter</span>
+        </div>
+
+        {/* ── Daftar / Suka / TdkSuka ── */}
+        <div style={{ display:'flex', gap:14, marginBottom:20, marginTop:4 }}>
+          {[
+            { label:'DAFTAR',   icon: inList    ? 'fa-check' : 'fa-plus',   active: inList,    fn: toggleList    },
+            { label:'SUKA',     icon:'fa-thumbs-up',                         active: liked,     fn: toggleLike    },
+            { label:'TDK SUKA', icon:'fa-thumbs-down',                       active: disliked,  fn: toggleDislike },
+          ].map(({ label, icon, active, fn }) => (
+            <div key={label} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+              <button className={`btn-icon-action ${active?'active':''}`} onClick={fn}>
+                <i className={`fas ${icon}`}></i>
+              </button>
+              <span style={{ fontSize:9, color:'#555', fontWeight:700 }}>{label}</span>
+            </div>
+          ))}
         </div>
 
         {info.description && (
