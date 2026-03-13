@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const KOMIK_API = '/komik_api.php';
 
@@ -13,29 +14,29 @@ async function fetchChapterPages(slug) {
 export default function BacaPage() {
   const [params] = useSearchParams();
   const nav      = useNavigate();
+  const { saveKomikProgress } = useAuth();
 
   const slug     = params.get('m')     || '';
   const title    = params.get('title') || '';
   const startIdx = parseInt(params.get('idx') || '0', 10);
+  const series   = params.get('series') || sessionStorage.getItem('komik_series') || '';
+  const poster   = params.get('poster') || '';
 
   const chapters = (() => {
     try { return JSON.parse(sessionStorage.getItem('komik_chapters')) || []; } catch { return []; }
   })();
-  const series = sessionStorage.getItem('komik_series') || '';
 
   // Each block = { chIdx, title, slug, pages }
   const [blocks,      setBlocks]      = useState([]);
   const [loadedSet,   setLoadedSet]   = useState(new Set());
   const [loadingNext, setLoadingNext] = useState(false);
   const [endReached,  setEndReached]  = useState(false);
-  const [scrolled,    setScrolled]    = useState(false);
+  const [curChTitle,  setCurChTitle]  = useState(title);
 
-  // Track which chapter is currently "ready to trigger next"
-  // Only allow trigger after current chapter images have all loaded
-  const readyRef      = useRef(false);   // true = first chapter done loading
-  const loadingRef    = useRef(false);   // prevent double-trigger
-  const sentinelRef   = useRef(null);    // single sentinel at bottom of last block
-  const containerRef  = useRef(null);
+  const readyRef    = useRef(false);
+  const loadingRef  = useRef(false);
+  const sentinelRef = useRef(null);
+  const containerRef = useRef(null);
 
   // ── Initial load ────────────────────────────────────────
   useEffect(() => {
@@ -46,13 +47,15 @@ export default function BacaPage() {
     setLoadedSet(new Set());
     setEndReached(false);
     setLoadingNext(true);
+    setCurChTitle(title);
 
     fetchChapterPages(slug)
       .then(pages => {
         setBlocks([{ chIdx: startIdx, title, slug, pages }]);
         setLoadedSet(new Set([startIdx]));
         setLoadingNext(false);
-        // Give images time to render before enabling infinite scroll
+        // Save progress
+        saveKomikProgress(slug, startIdx, title, poster, series);
         setTimeout(() => { readyRef.current = true; }, 1500);
       })
       .catch(e => { console.warn(e); setLoadingNext(false); });
@@ -68,7 +71,7 @@ export default function BacaPage() {
     if (currentSet.has(nextIdx)) return;
 
     loadingRef.current = true;
-    readyRef.current   = false; // pause trigger until new chapter renders
+    readyRef.current   = false;
     setLoadingNext(true);
 
     const ch = chapters[nextIdx];
@@ -79,9 +82,11 @@ export default function BacaPage() {
           return next;
         });
         setLoadedSet(prev => new Set([...prev, nextIdx]));
+        setCurChTitle(ch.title);
         setLoadingNext(false);
         loadingRef.current = false;
-        // Re-enable after new chapter renders
+        // Save progress for new chapter
+        saveKomikProgress(slug, nextIdx, ch.title, poster, series);
         setTimeout(() => { readyRef.current = true; }, 1500);
       })
       .catch(e => {
@@ -95,11 +100,9 @@ export default function BacaPage() {
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
-
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && readyRef.current && !loadingRef.current) {
-          // Capture current state at trigger time
           setBlocks(prev => {
             setLoadedSet(prevSet => {
               loadNext(prev, prevSet);
@@ -111,57 +114,62 @@ export default function BacaPage() {
       },
       { rootMargin: '300px' }
     );
-
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [blocks.length, endReached]); // re-attach when new block added
+  }, [blocks.length, endReached]);
 
-  // ── Scroll: sticky back button shadow ───────────────────
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const onScroll = () => setScrolled(el.scrollTop > 30);
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onScroll);
-  }, []);
+  const goBack = () => nav('/komik/detail?d=' + encodeURIComponent(slug));
 
   return (
     <div
       ref={containerRef}
-      style={{ background: '#0a0a0a', minHeight: '100vh', overflowY: 'auto', position: 'relative' }}
+      style={{ background: '#0a0a0a', minHeight: '100vh', position: 'relative', paddingTop: 56 }}
     >
-      {/* ── FLOATING BACK BUTTON — always sticky ── */}
-      <button
-        onClick={() => nav('/komik/detail?d=' + encodeURIComponent(slug))}
-        style={{
-          position:       'fixed',
-          top:            14,
-          left:           14,
-          zIndex:         300,
-          background:     scrolled ? 'rgba(0,0,0,0.88)' : 'rgba(0,0,0,0.55)',
-          backdropFilter: 'blur(10px)',
-          border:         '1px solid rgba(255,255,255,0.12)',
-          borderRadius:   '50%',
-          width: 40, height: 40,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontSize: 16, cursor: 'pointer',
-          boxShadow:  scrolled ? '0 2px 16px rgba(0,0,0,0.7)' : 'none',
-          transition: 'background 0.2s, box-shadow 0.2s',
-        }}
-      >
-        <i className="fas fa-chevron-left" />
-      </button>
-
-      {/* ── TITLE — normal flow, scrolls away ── */}
+      {/* ── STICKY HEADER — always visible ── */}
       <div style={{
-        padding:      '12px 14px 10px 66px',
-        borderBottom: '1px solid #1a1a1a',
+        position:       'fixed',
+        top:            0,
+        left:           0,
+        right:          0,
+        zIndex:         300,
+        height:         56,
+        background:     'rgba(10,10,10,0.97)',
+        backdropFilter: 'blur(14px)',
+        borderBottom:   '1px solid #1a1a1a',
+        display:        'flex',
+        alignItems:     'center',
+        gap:            10,
+        padding:        '0 14px',
       }}>
-        <div style={{ fontSize: 10, color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
-          {series}
-        </div>
-        <div style={{ fontSize: 14, color: '#fff', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {title}
+        {/* Back button — red circle like contoh */}
+        <button
+          onClick={goBack}
+          style={{
+            width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+            background:   'var(--primary)',
+            border:       'none',
+            display:      'flex', alignItems: 'center', justifyContent: 'center',
+            color:        '#fff', fontSize: 15, cursor: 'pointer',
+          }}
+        >
+          <i className="fas fa-chevron-left" />
+        </button>
+
+        {/* Title + Chapter */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: 10, color: '#aaa', fontWeight: 700,
+            textTransform: 'uppercase', letterSpacing: 0.8,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {series || slug}
+          </div>
+          <div style={{
+            fontSize: 13, color: '#fff', fontWeight: 700,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {curChTitle}
+          </div>
         </div>
       </div>
 
@@ -171,18 +179,15 @@ export default function BacaPage() {
           {/* Chapter divider for subsequent chapters */}
           {bi > 0 && (
             <div style={{
-              padding: '16px 16px 12px',
+              padding: '14px 16px 12px',
               borderTop: '3px solid #1e1e1e',
               background: '#0d0d0d',
-              display: 'flex', alignItems: 'center', gap: 10,
             }}>
-              <div>
-                <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: 1 }}>
-                  Chapter selanjutnya
-                </div>
-                <div style={{ fontSize: 14, color: '#fff', fontWeight: 700 }}>
-                  {block.title}
-                </div>
+              <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: 1 }}>
+                Chapter selanjutnya
+              </div>
+              <div style={{ fontSize: 14, color: '#fff', fontWeight: 700 }}>
+                {block.title}
               </div>
             </div>
           )}
@@ -206,12 +211,12 @@ export default function BacaPage() {
         </div>
       ))}
 
-      {/* ── SENTINEL — IntersectionObserver target ── */}
+      {/* ── SENTINEL ── */}
       {!endReached && (
         <div ref={sentinelRef} style={{ height: 1 }} />
       )}
 
-      {/* ── LOADING SPINNER ── */}
+      {/* ── LOADING ── */}
       {loadingNext && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 0', gap: 12 }}>
           <div className="spinner" />
@@ -219,14 +224,14 @@ export default function BacaPage() {
         </div>
       )}
 
-      {/* ── END OF SERIES ── */}
+      {/* ── END ── */}
       {endReached && !loadingNext && (
         <div style={{ textAlign: 'center', padding: '48px 20px 80px', color: '#333' }}>
           <div style={{ fontSize: 32, marginBottom: 10 }}>🎉</div>
           <div style={{ fontSize: 15, fontWeight: 700, color: '#555' }}>Tamat</div>
           <div style={{ fontSize: 12, color: '#333', marginTop: 6 }}>Semua chapter sudah dibaca</div>
           <button
-            onClick={() => nav('/komik/detail?d=' + encodeURIComponent(slug))}
+            onClick={goBack}
             style={{
               marginTop: 20, padding: '10px 28px', borderRadius: 10,
               background: 'var(--primary)', border: 'none',
@@ -236,8 +241,7 @@ export default function BacaPage() {
         </div>
       )}
 
-      {/* Bottom padding so last content isn't hidden behind nav */}
-      <div style={{ height: 60 }} />
+      <div style={{ height: 20 }} />
     </div>
   );
 }

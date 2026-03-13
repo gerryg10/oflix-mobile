@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchKomikDetail } from '../api.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const KOMIK_API = '/komik_api.php';
 
@@ -116,6 +117,7 @@ export default function KomikDetail() {
   const [params] = useSearchParams();
   const slug     = params.get('d') || '';
   const nav      = useNavigate();
+  const { getKomikProgress } = useAuth();
 
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
@@ -146,8 +148,10 @@ export default function KomikDetail() {
 
   function openChapter(idx) {
     if (!chapters[idx]) return;
+    // Save chapters list for infinite scroll in Baca
+    sessionStorage.setItem('komik_chapters', JSON.stringify(chapters.map(c => ({ title: c.title, url: c.bacaManga || c.url || c.slug }))));
+    sessionStorage.setItem('komik_series', series);
     setReader({ chapter: chapters[idx], idx });
-    // scroll to top
     document.getElementById('root')?.scrollTo(0, 0);
   }
 
@@ -221,6 +225,27 @@ export default function KomikDetail() {
             </button>
           </div>
         )}
+
+        {/* ── Lanjutkan Baca button ── */}
+        {(() => {
+          const prog = getKomikProgress(slug);
+          if (!prog) return null;
+          return (
+            <button
+              onClick={() => openChapter(prog.chapterIdx)}
+              style={{
+                width:'100%', padding:'14px 0', borderRadius:12, border:'none',
+                background:'var(--primary)', color:'#fff',
+                fontWeight:800, fontSize:14, cursor:'pointer',
+                display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                marginBottom:16,
+              }}
+            >
+              <i className="fas fa-book-open" />
+              Lanjutkan Baca · {prog.chapterTitle || `Ch ${prog.chapterIdx+1}`}
+            </button>
+          );
+        })()}
 
         <div style={{ marginTop:8 }}>
           <div style={{ fontSize:12, color:'#666', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:10 }}>

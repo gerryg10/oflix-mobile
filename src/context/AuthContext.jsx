@@ -75,6 +75,35 @@ export function AuthProvider({ children }) {
     } catch { return null; }
   }
 
+  // ── Komik read progress (localStorage only) ─────────────
+  function saveKomikProgress(slug, chapterIdx, chapterTitle, poster, seriesTitle) {
+    const key = `oflix_komik_${slug}`;
+    localStorage.setItem(key, JSON.stringify({
+      slug, chapterIdx, chapterTitle, poster, seriesTitle,
+      type: 'komik', savedAt: Date.now(),
+    }));
+  }
+
+  function getKomikProgress(slug) {
+    try {
+      const raw = localStorage.getItem(`oflix_komik_${slug}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  }
+
+  function getAllKomikProgress() {
+    const result = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k?.startsWith('oflix_komik_')) continue;
+      try {
+        const d = JSON.parse(localStorage.getItem(k));
+        if (d?.slug) result.push(d);
+      } catch {}
+    }
+    return result.sort((a, b) => (b.savedAt||0) - (a.savedAt||0)).slice(0, 10);
+  }
+
   // ── Watchlist (Daftar +) — works without login ───────────
   const WL_KEY = 'oflix_watchlist';
 
@@ -104,6 +133,7 @@ export function AuthProvider({ children }) {
       user, loading,
       login, register, logout,
       saveCW, getAllCW, getSavedProgress,
+      saveKomikProgress, getKomikProgress, getAllKomikProgress,
       getWatchlist, addToWatchlist, removeFromWatchlist, isInWatchlist,
     }}>
       {children}

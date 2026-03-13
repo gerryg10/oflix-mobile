@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { fetchCategory, fetchDetail } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import HorizontalSection from '../components/HorizontalSection.jsx';
@@ -81,7 +82,8 @@ export default function Home({ onCardClick }) {
   const [hero, setHero]               = useState(null);
   const [apiError, setApiError]       = useState('');
   const [loadingFirst, setLoadingFirst] = useState(true);
-  const { getAllCW, getWatchlist }     = useAuth();
+  const nav = useNavigate();
+  const { getAllCW, getWatchlist, getAllKomikProgress } = useAuth();
   const loadedRef = useRef(false);
 
   useEffect(() => {
@@ -111,6 +113,9 @@ export default function Home({ onCardClick }) {
   }, []);
 
   const cwItems    = getAllCW();
+  const komikItems = getAllKomikProgress ? getAllKomikProgress() : [];
+  // Merge and sort by savedAt
+  const allCwItems = [...cwItems, ...komikItems].sort((a,b) => (b.savedAt||0)-(a.savedAt||0)).slice(0,15);
   const wlItems    = getWatchlist ? getWatchlist() : [];
 
   return (
@@ -132,20 +137,33 @@ export default function Home({ onCardClick }) {
       <HeroBanner hero={!loadingFirst ? hero : null} onCardClick={onCardClick} />
 
       {/* Continue Watching */}
-      {cwItems.length > 0 && (
+      {allCwItems.length > 0 && (
         <section className="cw-section fade-up">
-          <div className="h-section-header"><h2 className="h-section-title">▶ Lanjut Nonton</h2></div>
+          <div className="h-section-header"><h2 className="h-section-title">▶ Lanjut Nonton/Baca</h2></div>
           <div className="cw-scroll">
-            {cwItems.map((item, i) => {
-              const pct = item.duration > 0 ? Math.min(100, Math.round((item.time/item.duration)*100)) : 0;
-              const epLabel = item.episode === -1 ? '' : `S${(item.seasonIdx||0)+1} E${(item.episode||0)+1}`;
+            {allCwItems.map((item, i) => {
+              const isKomik = item.type === 'komik';
+              const pct     = !isKomik && item.duration > 0 ? Math.min(100, Math.round((item.time/item.duration)*100)) : 0;
+              const epLabel = isKomik
+                ? (item.chapterTitle || `Ch ${(item.chapterIdx||0)+1}`)
+                : (item.episode === -1 ? '' : `S${(item.seasonIdx||0)+1} E${(item.episode||0)+1}`);
+              const handleClick = () => {
+                if (isKomik) {
+                  nav(`/komik/detail?d=${encodeURIComponent(item.slug)}`);
+                } else {
+                  onCardClick(item);
+                }
+              };
               return (
-                <div key={i} className="cw-card" onClick={() => onCardClick(item)}>
-                  <img src={(item.poster||'')} alt={item.title} />
+                <div key={i} className="cw-card" onClick={handleClick}>
+                  <img src={(item.poster||'')} alt={item.seriesTitle||item.title||''} />
+                  {isKomik && (
+                    <div style={{ position:'absolute', top:6, left:6, background:'var(--primary)', borderRadius:4, fontSize:8, fontWeight:900, color:'#fff', padding:'2px 5px', letterSpacing:0.5 }}>KOMIK</div>
+                  )}
                   <div className="cw-card-info">
-                    <div className="cw-card-title">{item.title}</div>
+                    <div className="cw-card-title">{item.seriesTitle||item.title||''}</div>
                     {epLabel && <div className="cw-card-ep">{epLabel}</div>}
-                    <div className="cw-progress-wrap"><div className="cw-progress-bar" style={{ width:pct+'%' }} /></div>
+                    {!isKomik && <div className="cw-progress-wrap"><div className="cw-progress-bar" style={{ width:pct+'%' }} /></div>}
                   </div>
                 </div>
               );

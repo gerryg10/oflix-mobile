@@ -14,8 +14,8 @@ import KomikDetail from './pages/KomikDetail.jsx';
 import SearchPage  from './pages/Search.jsx';
 import DetailPage  from './pages/Detail.jsx';
 
-const FULL_ROUTES   = ['/detail'];   // no header, no bottom nav, no padding
-const NO_NAV_ROUTES = ['/detail'];
+const FULL_ROUTES   = ['/detail', '/baca'];   // no header, no bottom nav, no padding
+const NO_NAV_ROUTES = ['/detail', '/baca'];
 
 function AppInner() {
   const nav = useNavigate();
