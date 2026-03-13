@@ -67,7 +67,7 @@ export default function SearchPage({ onCardClick }) {
   const srcColor = { film: '#e50914', donghua: '#e5a000', komik: '#4CAF50' };
 
   return (
-    <div className="search-page">
+    <div className="search-page" style={{ paddingTop: 14 }}>
       <div className="search-header">
         <div className="search-bar">
           <i className="fas fa-search"></i>
