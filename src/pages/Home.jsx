@@ -5,21 +5,22 @@ import { useAuth } from '../context/AuthContext.jsx';
 import HorizontalSection from '../components/HorizontalSection.jsx';
 
 const CATS = [
-  { label: '🏠 Beranda', path: '/'        },
-  { label: '🎬 Film',    path: '/film'    },
-  { label: '📺 Series',  path: '/series'  },
-  { label: '🐉 Donghua', path: '/donghua' },
-  { label: '📚 Komik',   path: '/komik'   },
+  { label: 'Home', path: '/'        },
+  { label: 'Movie',    path: '/film'    },
+  { label: 'Series',  path: '/series'  },
+  { label: 'Anichin', path: '/donghua' },
+  { label: 'Komik',   path: '/komik'   },
 ];
 
 const SECTIONS = [
-  { action: 'trending',          title: '🔥 Trending',        seeMore: '/film'   },
-  { action: 'indonesian-movies', title: '🇮🇩 Film Indonesia',  seeMore: '/film?cat=indonesian-movies' },
-  { action: 'indonesian-drama',  title: '🎭 Drama Indonesia',  seeMore: '/series?cat=indonesian-drama' },
-  { action: 'kdrama',            title: '🇰🇷 K-Drama',         seeMore: '/series?cat=kdrama' },
-  { action: 'anime',             title: '⛩️ Anime',            seeMore: '/series?cat=anime' },
-  { action: 'western-tv',        title: '🇺🇸 Series Barat',    seeMore: '/series?cat=western-tv' },
-  { action: 'short-tv',          title: '📱 Drama Box',         seeMore: '/series?cat=short-tv' },
+  { action: 'trending',          title: 'Populer',        seeMore: '/film'   },
+  { action: 'indonesian-movies', title: 'Film Indonesia',  seeMore: '/film?cat=indonesian-movies' },
+  { action: 'indonesian-drama',  title: 'Series Indonesia',  seeMore: '/series?cat=indonesian-drama' },
+  { action: 'kdrama',            title: 'K-Drama',         seeMore: '/series?cat=kdrama' },
+  { action: 'anime',             title: 'Anime',            seeMore: '/series?cat=anime' },
+  { action: 'western-tv',        title: 'Series Barat',    seeMore: '/series?cat=western-tv' },
+  { action: 'short-tv',          title: 'Dracin',         seeMore: '/series?cat=short-tv' },
+  { action: 'komik',             title: 'Baca Komik',         seeMore: '/komik' },
 ];
 
 function HeroBanner({ items, onCardClick }) {
@@ -163,13 +164,13 @@ export default function Home({ onCardClick }) {
       {loadingFirst && (
         <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh', flexDirection:'column', gap:16 }}>
           <div className="spinner" />
-          <span style={{ color:'#555', fontSize:12 }}>Memuat konten...</span>
+          <span style={{ color:'#555', fontSize:12 }}>Memuat...</span>
         </div>
       )}
 
       {apiError && !loadingFirst && (
         <div style={{ margin:14, padding:14, background:'#1a0a0a', border:'1px solid #440000', borderRadius:10 }}>
-          <div style={{ color:'#ff6b6b', fontSize:12, fontWeight:700, marginBottom:6 }}>⚠️ Gagal load API</div>
+          <div style={{ color:'#ff6b6b', fontSize:12, fontWeight:700, marginBottom:6 }}>⚠️ Backend Gagal Di Load</div>
           <div style={{ color:'#666', fontSize:10, fontFamily:'monospace', wordBreak:'break-all' }}>{apiError}</div>
         </div>
       )}
