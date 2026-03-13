@@ -11,7 +11,7 @@ const SECTIONS = [
   { action: 'kdrama',            title: 'K-Drama',              seeMore: '/series?cat=kdrama' },
   { action: 'anime',             title: 'Anime',                seeMore: '/series?cat=anime' },
   { action: 'western-tv',        title: 'Series Barat',         seeMore: '/series?cat=western-tv' },
-  { action: 'short-tv',          title: 'Anichin',              seeMore: '/series?cat=short-tv' },
+  { action: 'short-tv',          title: 'Drachin',              seeMore: '/series?cat=short-tv' },
   { action: 'komik-populer',      title: '📚 Komik Populer',     seeMore: '/komik', isKomik: true },
 ];
 
