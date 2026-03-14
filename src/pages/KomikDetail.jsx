@@ -280,7 +280,7 @@ export default function KomikDetail() {
   const [params] = useSearchParams();
   const slug     = params.get('d') || '';
   const nav      = useNavigate();
-  const { getKomikProgress, saveKomikProgress } = useAuth();
+  const { getKomikProgress, saveKomikProgress, addToWatchlist, removeFromWatchlist, isInWatchlist } = useAuth();
 
   const [data,      setData]      = useState(null);
   const [loading,   setLoading]   = useState(true);
@@ -289,7 +289,7 @@ export default function KomikDetail() {
   const [poster,    setPoster]    = useState('');
   const [descOpen,  setDescOpen]  = useState(false);
   const [readerIdx, setReaderIdx] = useState(null);
-  const [inList,    setInList]    = useState(() => localStorage.getItem(`oflix_komik_wl_${slug||'x'}`) === '1');
+  const [inList,    setInList]    = useState(false); // init after slug loads
   const [liked,     setLiked]     = useState(() => localStorage.getItem(`oflix_komik_like_${slug||'x'}`) === '1');
   const [disliked,  setDisliked]  = useState(() => localStorage.getItem(`oflix_komik_dislike_${slug||'x'}`) === '1'); // null = detail view
   const [progVersion, setProgVersion] = useState(0); // bump to re-read progress
@@ -312,7 +312,25 @@ export default function KomikDetail() {
     }).catch(() => setLoading(false));
   }, [slug]);
 
-  function toggleList()    { const v=!inList;    setInList(v);    localStorage.setItem(`oflix_komik_wl_${slug}`,v?'1':'0'); }
+  // sync inList with watchlist on data load
+  useEffect(() => {
+    if (slug) setInList(isInWatchlist ? isInWatchlist(slug) : false);
+  }, [slug, data]);
+
+  function toggleList() {
+    const v = !inList;
+    setInList(v);
+    if (v) {
+      addToWatchlist && addToWatchlist({
+        title: series || slug,
+        detailPath: slug,
+        poster: poster,
+        type: 'komik',
+      });
+    } else {
+      removeFromWatchlist && removeFromWatchlist(slug);
+    }
+  }
   function toggleLike()    { const v=!liked;    setLiked(v);    if(v) setDisliked(false); localStorage.setItem(`oflix_komik_like_${slug}`,v?'1':'0'); localStorage.setItem(`oflix_komik_dislike_${slug}`,'0'); }
   function toggleDislike() { const v=!disliked; setDisliked(v); if(v) setLiked(false);    localStorage.setItem(`oflix_komik_dislike_${slug}`,v?'1':'0'); localStorage.setItem(`oflix_komik_like_${slug}`,'0'); }
 

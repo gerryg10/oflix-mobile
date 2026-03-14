@@ -20,17 +20,31 @@ function HeroBanner({ items, onCardClick }) {
   const [showVideo,  setShowVideo]  = useState(false);
   const [muted,      setMuted]      = useState(true);
   const [trailerUrl, setTrailerUrl] = useState('');
+  const [fade,      setFade]       = useState(true);
   const videoRef  = useRef(null);
   const timerRef  = useRef(null);
   const autoRef   = useRef(null);
 
   const hero = items?.[idx] || null;
+  const [fade, setFade] = useState(true);
 
-  // Auto-advance every 6s
+  // Trigger fade on hero change
+  const prevIdx = useRef(idx);
+  useEffect(() => {
+    if (prevIdx.current !== idx) {
+      setFade(false);
+      const t = setTimeout(() => setFade(true), 50);
+      prevIdx.current = idx;
+      return () => clearTimeout(t);
+    }
+  }, [idx]);
+
+  // Auto-advance
   useEffect(() => {
     if (!items?.length) return;
     autoRef.current = setInterval(() => {
-      setIdx(v => (v + 1) % items.length);
+      setFade(false);
+      setTimeout(() => { setIdx(v => (v + 1) % items.length); setFade(true); }, 180);
     }, 96000);
     return () => clearInterval(autoRef.current);
   }, [items?.length]);
@@ -38,9 +52,11 @@ function HeroBanner({ items, onCardClick }) {
   // Reset auto-timer on manual nav
   function goTo(i) {
     clearInterval(autoRef.current);
-    setIdx(i);
+    setFade(false);
+    setTimeout(() => { setIdx(i); setFade(true); }, 180);
     autoRef.current = setInterval(() => {
-      setIdx(v => (v + 1) % items.length);
+      setFade(false);
+      setTimeout(() => { setIdx(v => { const n=(v+1)%items.length; return n; }); setFade(true); }, 180);
     }, 96000);
   }
   function prev(e) { e.stopPropagation(); goTo((idx - 1 + (items?.length||1)) % (items?.length||1)); }
@@ -65,7 +81,7 @@ function HeroBanner({ items, onCardClick }) {
   if (!hero) return null;
 
   return (
-    <div className="hero-banner" onClick={() => onCardClick(hero)}>
+    <div className={`hero-banner${fade ? " hero-fade-in" : " hero-fade-out"}`} onClick={() => onCardClick(hero)}>
       <img src={hero.poster} alt={hero.title}
         style={{ display: showVideo ? 'none' : 'block' }}
         onError={e => { e.target.style.display='none'; }} />
@@ -83,19 +99,6 @@ function HeroBanner({ items, onCardClick }) {
         <i className="fas fa-chevron-right" />
       </button>
 
-      {/* Dot indicators — show 3 dots, sliding window */}
-      <div className="hero-dots">
-        {[0, 1, 2].map(offset => {
-          const total = items.length;
-          const dotIdx = (idx + offset - 1 + total) % total;
-          const isActive = offset === 1;
-          return (
-            <button key={offset} className={`hero-dot ${isActive ? 'active' : ''}`}
-              onClick={e => { e.stopPropagation(); goTo(dotIdx); }} />
-          );
-        })}
-      </div>
-
       {/* Mute button — top right corner, independent */}
       {showVideo && (
         <button className="hero-mute-btn" onClick={e => { e.stopPropagation(); setMuted(v=>!v); }}>
@@ -105,9 +108,22 @@ function HeroBanner({ items, onCardClick }) {
 
       <div className="hero-content">
         <div className="hero-title">{hero.title}</div>
-        <button className="hero-play-btn" onClick={e => { e.stopPropagation(); onCardClick(hero); }}>
-          <i className="fas fa-play"></i> Tonton
-        </button>
+        <div className="hero-bottom-row">
+          <button className="hero-play-btn" onClick={e => { e.stopPropagation(); onCardClick(hero); }}>
+            <i className="fas fa-play"></i> Tonton
+          </button>
+          <div className="hero-dots">
+            {[0, 1, 2].map(offset => {
+              const total = items.length;
+              const dotIdx = (idx + offset - 1 + total) % total;
+              const isActive = offset === 1;
+              return (
+                <button key={offset} className={`hero-dot ${isActive ? 'active' : ''}`}
+                  onClick={e => { e.stopPropagation(); goTo(dotIdx); }} />
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -223,12 +239,21 @@ export default function Home({ onCardClick }) {
         <section className="cw-section fade-up">
           <div className="h-section-header"><h2 className="h-section-title">+ Daftar Saya</h2></div>
           <div className="h-scroll">
-            {wlItems.map((item, i) => (
-              <div key={i} className="movie-card" style={{ width:110, flexShrink:0 }} onClick={() => onCardClick(item)}>
-                <img src={(item.poster||'')} alt={item.title} />
-                <div className="card-label">{item.title}</div>
-              </div>
-            ))}
+            {wlItems.map((item, i) => {
+              const isKomikWl = item.type === 'komik';
+              return (
+                <div key={i} className="movie-card" style={{ width:110, flexShrink:0, position:'relative' }}
+                  onClick={() => isKomikWl
+                    ? nav(`/komik/detail?d=${encodeURIComponent(item.detailPath)}`)
+                    : onCardClick(item)}>
+                  <img src={(item.poster||'')} alt={item.title} />
+                  {isKomikWl && (
+                    <div style={{ position:'absolute', top:6, left:6, background:'var(--primary)', borderRadius:4, fontSize:8, fontWeight:900, color:'#fff', padding:'2px 5px', letterSpacing:0.5 }}>KOMIK</div>
+                  )}
+                  <div className="card-label">{item.title}</div>
+                </div>
+              );
+            })}
           </div>
         </section>
       )}

@@ -47,7 +47,7 @@ function doFetch($url) {
 
 function cachedFetch($key, $ttl, $fn) {
     global $cacheDir, $debug;
-    $file = $cacheDir . 'donghua_' . md5($key) . '.json';
+    $file = $cacheDir . 'donghua_' . md5($key) . '.json'; // /tmp/cache_json/donghua_*.json
     if (!$debug && file_exists($file) && (time() - filemtime($file) < $ttl)) {
         $d = json_decode(file_get_contents($file), true);
         if ($d && !empty($d['success'])) {

@@ -4,11 +4,11 @@ const CATS = [
   { label: '🏠 Beranda', path: '/'        },
   { label: '🎬 Film',    path: '/film'    },
   { label: '📺 Series',  path: '/series'  },
-  { label: '🐉 Donghua', path: '/donghua' },
+  { label: '🐲 Anichin', path: '/donghua' },
   { label: '📚 Komik',   path: '/komik'   },
 ];
 
-const HIDE_ROUTES = ['/detail', '/baca', '/search'];
+const HIDE_ROUTES = ['/detail', '/baca', '/search', '/komik/detail'];
 
 export default function CategoryTabs() {
   const nav = useNavigate();

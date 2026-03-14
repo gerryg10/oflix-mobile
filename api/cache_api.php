@@ -30,7 +30,7 @@ if (!is_dir($cacheDir)) mkdir($cacheDir, 0777, true);
 $cacheKey  = md5(json_encode($params));
 $cacheFile = $cacheDir . $cacheKey . '.json';
 
-if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < 86400)) {
+if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < 600)) { // 10 menit
     echo file_get_contents($cacheFile);
     exit;
 }

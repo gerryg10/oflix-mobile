@@ -51,7 +51,7 @@ $cacheKey = md5("stream_{$id}_{$season}_{$episode}_{$detailPath}");
 $cacheFile = $jsonCacheDir . "stream_" . $cacheKey . ".json";
 
 // Cek cache (valid 1 jam untuk testing, 24 jam untuk production)
-$cacheTime = $debug ? 300 : 3600; // 5 menit debug, 1 jam production
+$cacheTime = $debug ? 60 : 600; // 1 menit debug, 10 menit production
 if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTime)) {
     $cachedContent = file_get_contents($cacheFile);
     

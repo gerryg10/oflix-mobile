@@ -115,7 +115,7 @@ export function AuthProvider({ children }) {
   function addToWatchlist(item) {
     const wl = getWatchlist();
     if (wl.find(w => w.detailPath === item.detailPath)) return; // already in list
-    wl.unshift({ title: item.title, detailPath: item.detailPath, poster: item.poster, addedAt: Date.now() });
+    wl.unshift({ title: item.title, detailPath: item.detailPath, poster: item.poster, type: item.type || 'video', addedAt: Date.now() });
     localStorage.setItem(WL_KEY, JSON.stringify(wl.slice(0, 50)));
   }
 

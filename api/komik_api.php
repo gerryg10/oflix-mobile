@@ -26,10 +26,10 @@ define('PYTHON_API', 'https://unstrained-commandingly-arya.ngrok-free.dev/api');
 
 // TTL cache per action (detik)
 $TTL = [
-    'populer' => 3600,    // 1 jam
-    'search'  => 1800,    // 30 menit
-    'detail'  => 7200,    // 2 jam
-    'baca'    => 86400,   // 1 hari
+    'populer' => 600,     // 10 menit
+    'search'  => 600,     // 10 menit
+    'detail'  => 600,     // 10 menit
+    'baca'    => 600,     // 10 menit
 ];
 
 // Ambil semua parameter

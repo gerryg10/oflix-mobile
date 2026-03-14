@@ -1,11 +1,11 @@
-export default function DonghuaPage() {
+export default function AnichinPage() {
   return (
     <div className="listing-page">
       <div className="coming-soon-page">
         <div className="coming-soon-icon">🐉</div>
-        <h1 className="coming-soon-title">Donghua</h1>
+        <h1 className="coming-soon-title">Anichin</h1>
         <p className="coming-soon-sub">
-          Konten Donghua sedang dalam persiapan.<br />
+          Konten Anichin sedang dalam persiapan.<br />
           Segera hadir! Nantikan update terbaru kami.
         </p>
         <div style={{ marginTop: 30, display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>

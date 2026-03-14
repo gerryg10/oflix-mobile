@@ -34,7 +34,7 @@ $cacheKey  = md5($srtUrl);
 $cacheFile = $cacheDir . $cacheKey . '.vtt';
 
 // Serve dari cache jika ada (valid 6 jam)
-if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < 21600)) {
+if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < 600)) { // 10 menit
     readfile($cacheFile);
     exit;
 }

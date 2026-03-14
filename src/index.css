@@ -913,17 +913,16 @@ button { cursor: pointer; font-family: var(--font-body); }
 .hero-next { right: 10px; }
 
 .hero-dots {
-  position: absolute; bottom: 54px; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 6px; z-index: 10;
-  pointer-events: auto;
+  display: flex; gap: 5px; align-items: center;
+  /* inline beside play button, no absolute */
 }
 .hero-dot {
-  width: 20px; height: 4px; border-radius: 2px;
-  background: rgba(255,255,255,0.3); border: none; cursor: pointer;
-  padding: 0; transition: 0.25s;
+  width: 16px; height: 4px; border-radius: 2px;
+  background: rgba(255,255,255,0.35); border: none; cursor: pointer;
+  padding: 0; transition: 0.25s; flex-shrink: 0;
 }
 .hero-dot.active {
-  width: 32px;
+  width: 26px;
   background: var(--primary);
 }
 .hero-mute-btn {
@@ -933,4 +932,38 @@ button { cursor: pointer; font-family: var(--font-body); }
   color: #fff; font-size: 14px;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; flex-shrink: 0;
+}
+
+/* ─── HERO FADE ANIMATION ────────────────────────────────── */
+@keyframes heroFadeIn {
+  from { opacity: 0; transform: scale(1.02); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.hero-fade-in  { animation: heroFadeIn 0.35s ease forwards; }
+.hero-fade-out { opacity: 0; }
+
+/* ─── HERO BOTTOM ROW (play + dots side by side) ─────────── */
+.hero-bottom-row {
+  display: flex; align-items: center; gap: 12px;
+}
+
+/* ─── HERO FADE ANIMATION ────────────────────────────────── */
+@keyframes heroFadeIn {
+  from { opacity: 0; transform: scale(1.015); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.hero-banner {
+  animation: heroFadeIn 0.35s ease forwards;
+}
+.hero-banner.hero-fade-out {
+  opacity: 0;
+  transform: scale(1.015);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+/* ─── HERO BOTTOM ROW (play + dots side by side) ────────── */
+.hero-bottom-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }

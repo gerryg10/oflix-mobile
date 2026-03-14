@@ -7,23 +7,61 @@ export const DONGHUA_API = '/donghua_api.php';
 
 export function imgProxy(url) { return url || ''; }
 
-// Hapus query string (hanya untuk URL yang TIDAK butuh query, misal subtitle)
 export function stripQuery(url) {
   return (url || '').split('?')[0];
 }
 
+// ── Frontend in-memory cache (10 menit TTL) ──────────────────────────────────
+const _cache = new Map(); // key → { data, ts }
+const CACHE_TTL = 10 * 60 * 1000; // 10 menit ms
+
+function cacheGet(key) {
+  const entry = _cache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > CACHE_TTL) { _cache.delete(key); return null; }
+  return entry.data;
+}
+function cacheSet(key, data) {
+  _cache.set(key, { data, ts: Date.now() });
+}
+
+// ── Inflight dedup — kalau request yang sama lagi jalan, tunggu hasilnya ─────
+const _inflight = new Map();
+
 async function safeFetch(url, opts = {}) {
+  // Hanya cache GET request tanpa body
+  const isGet = !opts.method || opts.method === 'GET';
+  const cacheKey = isGet ? url : null;
+
+  if (cacheKey) {
+    const hit = cacheGet(cacheKey);
+    if (hit) return hit;
+
+    // Kalau sedang inflight, return promise yang sama
+    if (_inflight.has(cacheKey)) return _inflight.get(cacheKey);
+  }
+
   const controller = new AbortController();
   const tid = setTimeout(() => controller.abort(), 12000);
-  try {
-    const res  = await fetch(url, { ...opts, signal: controller.signal });
-    clearTimeout(tid);
-    const text = await res.text();
-    try { return JSON.parse(text); }
-    catch { throw new Error('Non-JSON: ' + text.slice(0, 120)); }
-  } finally {
-    clearTimeout(tid);
-  }
+
+  const promise = (async () => {
+    try {
+      const res  = await fetch(url, { ...opts, signal: controller.signal });
+      clearTimeout(tid);
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); }
+      catch { throw new Error('Non-JSON: ' + text.slice(0, 120)); }
+      if (cacheKey) cacheSet(cacheKey, data);
+      return data;
+    } finally {
+      clearTimeout(tid);
+      if (cacheKey) _inflight.delete(cacheKey);
+    }
+  })();
+
+  if (cacheKey) _inflight.set(cacheKey, promise);
+  return promise;
 }
 
 export async function fetchCategory(action, page = 1) {
