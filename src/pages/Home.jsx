@@ -26,18 +26,6 @@ function HeroBanner({ items, onCardClick }) {
   const autoRef   = useRef(null);
 
   const hero = items?.[idx] || null;
-  const [fade, setFade] = useState(true);
-
-  // Trigger fade on hero change
-  const prevIdx = useRef(idx);
-  useEffect(() => {
-    if (prevIdx.current !== idx) {
-      setFade(false);
-      const t = setTimeout(() => setFade(true), 50);
-      prevIdx.current = idx;
-      return () => clearTimeout(t);
-    }
-  }, [idx]);
 
   // Auto-advance
   useEffect(() => {
