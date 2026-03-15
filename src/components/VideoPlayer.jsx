@@ -91,36 +91,50 @@ export default function VideoPlayer({
         const source = ctx.createMediaElementSource(video);
         sourceRef.current = source;
 
-        // ── 1. High-shelf EQ: boost dialogue presence (2–8 kHz) ──
-        const hiMid = ctx.createBiquadFilter();
-        hiMid.type            = 'peaking';
-        hiMid.frequency.value = 3500;   // centre of voice intelligibility
-        hiMid.Q.value         = 0.9;
-        hiMid.gain.value      = 4;      // +4 dB
-
-        // ── 2. Low-cut: remove mud below 100 Hz ──────────────────
+        // ── 1. High-pass 90Hz: remove sub-bass rumble ──────────
         const lowCut = ctx.createBiquadFilter();
         lowCut.type            = 'highpass';
-        lowCut.frequency.value = 100;
+        lowCut.frequency.value = 90;
         lowCut.Q.value         = 0.7;
 
-        // ── 3. Compressor: level out loud/quiet swings ───────────
+        // ── 2. Low shelf +2dB @ 80Hz: bass warmth ────────────────
+        const lowShelf = ctx.createBiquadFilter();
+        lowShelf.type            = 'lowshelf';
+        lowShelf.frequency.value = 80;
+        lowShelf.gain.value      = 2;    // +2 dB
+
+        // ── 3. Hi-mid peaking +3dB @ 3kHz: voice clarity ─────────
+        const hiMid = ctx.createBiquadFilter();
+        hiMid.type            = 'peaking';
+        hiMid.frequency.value = 3000;
+        hiMid.Q.value         = 0.9;
+        hiMid.gain.value      = 3;       // +3 dB
+
+        // ── 4. Compressor: tame dynamic swings ───────────────────
         const comp = ctx.createDynamicsCompressor();
-        comp.threshold.value = -24;   // start compressing at -24 dBFS
+        comp.threshold.value = -24;
         comp.knee.value      = 8;
-        comp.ratio.value     = 4;     // 4:1 ratio
-        comp.attack.value    = 0.003; // fast attack (3 ms)
-        comp.release.value   = 0.25;  // 250 ms release
+        comp.ratio.value     = 4;
+        comp.attack.value    = 0.003;
+        comp.release.value   = 0.25;
 
-        // ── 4. Makeup gain: bring overall loudness up ─────────────
+        // ── 5. High shelf +1.5dB @ 8kHz: air / hi-fi ambience ────
+        const highShelf = ctx.createBiquadFilter();
+        highShelf.type            = 'highshelf';
+        highShelf.frequency.value = 8000;
+        highShelf.gain.value      = 1.5; // +1.5 dB
+
+        // ── 6. Makeup gain ────────────────────────────────────────
         const gain = ctx.createGain();
-        gain.gain.value = 1.4;        // +~3 dB perceived loudness
+        gain.gain.value = 1.4;
 
-        // Chain: source → lowCut → hiMid → comp → gain → output
+        // Chain: source → highpass → lowShelf → hiMid → comp → highShelf → gain → speakers
         source.connect(lowCut);
-        lowCut.connect(hiMid);
+        lowCut.connect(lowShelf);
+        lowShelf.connect(hiMid);
         hiMid.connect(comp);
-        comp.connect(gain);
+        comp.connect(highShelf);
+        highShelf.connect(gain);
         gain.connect(ctx.destination);
 
         // Resume context if suspended (browser autoplay policy)
