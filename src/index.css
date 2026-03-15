@@ -377,21 +377,10 @@ button { cursor: pointer; font-family: var(--font-body); }
   height: auto;
   max-height: 100%;
   display: block;
-  /* GPU compositing layer */
   transform: translateZ(0);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
-  will-change: transform;
-  /* Cinematic color boost */
   filter: contrast(1.05) saturate(1.05) brightness(1.02);
-  /* Smooth opacity on load */
-  opacity: 1;
-  transition: opacity 0.2s ease;
-  /* Display sync hint */
-  image-rendering: auto;
-}
-.player-video-wrap video.video-loading {
-  opacity: 0;
 }
 
 /* Controls overlay — sits on top of video, same layer */
@@ -983,53 +972,4 @@ button { cursor: pointer; font-family: var(--font-body); }
   gap: 12px;
 }
 
-/* ── AMBIENT LIGHT EFFECT ─────────────────────────────────── */
-.player-ambient {
-  position: absolute;
-  inset: -10%;
-  z-index: 0;
-  background: inherit;
-  filter: blur(80px) brightness(0.45) saturate(1.4);
-  transform: scale(1.2);
-  pointer-events: none;
-  opacity: 0.6;
-  transition: opacity 0.4s ease;
-}
-/* Sync ambient bg to video poster via JS — fallback gradient */
-.player-overlay { background: #000; }
-.player-video-wrap { z-index: 1; position: relative; }
 
-/* ── BUFFERING PROGRESS BAR (YouTube-style top) ──────────── */
-@keyframes bufferSlide {
-  0%   { left: -40%; width: 40%; }
-  60%  { left: 60%;  width: 40%; }
-  100% { left: 100%; width: 40%; }
-}
-.player-buffer-bar {
-  position: absolute;
-  top: 0; left: 0;
-  height: 3px;
-  width: 40%;
-  background: linear-gradient(90deg, transparent, #fff, transparent);
-  z-index: 9999;
-  animation: bufferSlide 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  pointer-events: none;
-}
-
-/* ── BUFFERING SPINNER (Netflix-style center) ────────────── */
-.player-buffer-spinner {
-  position: absolute;
-  inset: 0; z-index: 9998;
-  display: flex; align-items: center; justify-content: center;
-  pointer-events: none;
-}
-@keyframes spinRing {
-  to { transform: rotate(360deg); }
-}
-.player-buffer-ring {
-  width: 48px; height: 48px;
-  border-radius: 50%;
-  border: 3px solid rgba(255,255,255,0.15);
-  border-top-color: #fff;
-  animation: spinRing 0.8s linear infinite;
-}

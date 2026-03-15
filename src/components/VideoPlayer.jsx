@@ -40,32 +40,16 @@ export default function VideoPlayer({
   const [curDlIdx, setCurDlIdx]       = useState(0);
   const [subIdx, setSubIdx]           = useState(0);
   const [subSize, setSubSize]         = useState('medium'); // small=14 medium=24 large=32
-  const [isBuffering, setIsBuffering]   = useState(false);
-  const rAFRef   = useRef(null);
-  const ambientRef = useRef(null);
+
 
   /* ── cleanup blobs ──────────────────────────────────── */
   useEffect(() => () => blobUrls.current.forEach(u => URL.revokeObjectURL(u)), []);
 
   // Cleanup AudioContext on unmount
-  useEffect(() => {
-    // rAF loop — keeps compositor thread active, reduces frame drop on battery-saver modes
-    function loop() { rAFRef.current = requestAnimationFrame(loop); }
-    rAFRef.current = requestAnimationFrame(loop);
-    // Ambient light: pull video poster color from first prop (url-based)
-    // Using a subtle gradient instead of canvas extraction (no CORS issues with MP4)
-    if (ambientRef.current) {
-      // For HLS/MP4 use a warm dark glow — canvas frame extraction would need same-origin
-      ambientRef.current.style.background =
-        'radial-gradient(ellipse at center, rgba(40,20,10,0.8) 0%, #000 70%)';
-    }
-
-    return () => {
-      cancelAnimationFrame(rAFRef.current);
-      try { audioCtxRef.current?.close(); } catch {}
-      audioCtxRef.current = null;
-      sourceRef.current   = null;
-    };
+  useEffect(() => () => {
+    try { audioCtxRef.current?.close(); } catch {}
+    audioCtxRef.current = null;
+    sourceRef.current   = null;
   }, []);
 
   /* ── track fullscreen state ─────────────────────────── */
@@ -171,22 +155,11 @@ export default function VideoPlayer({
     if (url.includes('.m3u8')) {
       if (Hls.isSupported()) {
         const hls = new Hls({
-          enableWorker:             true,
-          fragLoadingMaxRetry:      10,
-          startLevel:               -1,          // overridden to highest after MANIFEST_PARSED
-          autoLevelCapping:         -1,           // no quality cap
-          abrEwmaDefaultEstimate:   10_000_000,   // assume 10Mbps → starts at highest
-          // ── Buffer / preload tuning ──────────────────────────
-          maxBufferLength:          60,            // try to buffer 60s ahead
-          maxMaxBufferLength:       120,           // allow up to 120s in memory
-          maxBufferSize:            100 * 1000 * 1000, // 100MB buffer cap
-          maxBufferHole:            0.5,           // tolerate 0.5s gaps without stall
-          // ── Fragment loading ─────────────────────────────────
-          fragLoadingTimeOut:       20_000,
-          manifestLoadingTimeOut:   10_000,
-          levelLoadingTimeOut:      10_000,
-          // ── Smooth level switching ───────────────────────────
-          appendErrorMaxRetry:      4,
+          enableWorker: true,
+          fragLoadingMaxRetry: 10,
+          startLevel: -1,
+          autoLevelCapping: -1,
+          abrEwmaDefaultEstimate: 10_000_000,
         });
         hls.loadSource(url);
         hls.attachMedia(video);
@@ -202,11 +175,6 @@ export default function VideoPlayer({
           startPlay();
         });
 
-        // FRAG_LOADED: clear buffering indicator when first fragment arrives
-        hls.on(Hls.Events.FRAG_LOADED, () => setIsBuffering(false));
-        hls.on(Hls.Events.ERROR, (_, data) => {
-          if (data.fatal) setIsBuffering(false);
-        });
         hlsRef.current = hls;
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = url;
@@ -441,37 +409,22 @@ export default function VideoPlayer({
       onTouchStart={showControls}
       onClick={showControls}
     >
-      {/* ── AMBIENT LIGHT BG ─────────────────────────────── */}
-      <div ref={ambientRef} className="player-ambient" aria-hidden="true" />
-
       {/* ── VIDEO ────────────────────────────────────────── */}
       <div className="player-video-wrap">
         <video
           ref={videoRef}
           playsInline
-          preload="auto"
           crossOrigin="anonymous"
           onTimeUpdate={e => setCurTime(e.target.currentTime)}
           onDurationChange={e => setDuration(e.target.duration)}
           onPlay={() => { setPlaying(true); showControls(); }}
           onPause={() => setPlaying(false)}
-          onWaiting={() => setIsBuffering(true)}
-          onPlaying={() => setIsBuffering(false)}
-          onCanPlay={() => setIsBuffering(false)}
           onEnded={() => {
             onSaveCW?.({ time: 0, duration, episode: currentEpIdx, seasonIdx: currentSeasonIdx });
             if (currentEpIdx >= 0 && currentEpIdx < eps.length - 1) playEp(currentSeasonIdx, currentEpIdx + 1);
           }}
         />
       </div>
-
-      {/* ── BUFFERING BAR ─────────────────────────────────── */}
-      {isBuffering && <div className="player-buffer-bar" />}
-      {isBuffering && (
-        <div className="player-buffer-spinner">
-          <div className="player-buffer-ring" />
-        </div>
-      )}
 
       {/* ── CONTROLS OVERLAY ─────────────────────────────── */}
       <div
